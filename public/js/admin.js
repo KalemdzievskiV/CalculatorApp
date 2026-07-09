@@ -8,6 +8,13 @@
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fmt = (v) => new Intl.NumberFormat('mk-MK', { maximumFractionDigits: 2 }).format(v);
 
+  // Мобилно мени за админ навигацијата
+  const adminBurger = $('#adminBurger'), adminLinks = $('#adminLinks');
+  if (adminBurger && adminLinks) {
+    adminBurger.onclick = () => adminLinks.classList.toggle('open');
+    adminLinks.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => adminLinks.classList.remove('open')));
+  }
+
   async function api(path, method, body) {
     const r = await fetch(path, {
       method: method || 'GET',

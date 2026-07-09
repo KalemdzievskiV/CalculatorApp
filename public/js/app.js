@@ -523,6 +523,8 @@
   if (nx) nx.onclick = () => { notice.classList.add('hidden'); sessionStorage.setItem('mdaNoticeClosed', '1'); syncNoticeHeight(); };
   syncNoticeHeight();
   window.addEventListener('resize', syncNoticeHeight);
+  // Повторно измери откако ќе се вчита веб-фонтот (може да ја промени висината на лентата)
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(syncNoticeHeight);
 
   // Навигацијата станува цврста штом ќе се скролне од херо-то
   function onScroll() {
