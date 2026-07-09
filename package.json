@@ -1,0 +1,14 @@
+{
+  "name": "mda-calculator",
+  "version": "1.0.0",
+  "description": "Modular Design Architects — калкулатор на цени со админ панел",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "verify": "node test/verify.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "private": true
+}

@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modular Design Architects — Монтажни куќи</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ═══ НАВИГАЦИЈА ═══ -->
+<nav class="nav no-print">
+  <a class="brand" href="#home"><span class="logo">M</span><span>MODULAR DESIGN</span></a>
+  <div class="links">
+    <a href="#about">ЗА НАС</a>
+    <a href="#models">МОДЕЛИ</a>
+    <a href="#calc">КАЛКУЛАТОР</a>
+    <a href="#contact">КОНТАКТ</a>
+    <a href="admin.html" style="color: var(--muted);">АДМИН</a>
+  </div>
+  <a class="cta" id="phoneCta" href="tel:+38971336108">071 336 108</a>
+</nav>
+
+<!-- ═══ ХЕРО ═══ -->
+<header id="home" class="hero-land no-print">
+  <div class="hero-meta">
+    <span>ISO 9001:2015</span><span class="d" style="color: var(--accent);">/</span>
+    <span>СКОПЈЕ · МК</span><span style="color: var(--accent);">/</span>
+    <span>МОНТАЖНИ КУЌИ</span>
+  </div>
+  <div class="hero-grid">
+    <h1 data-reveal="80">ПОМАЛКУ<br>КУЌА,<br><span class="acc">ПОВЕЌЕ</span> ДОМ</h1>
+    <div data-reveal="160">
+      <p>Монтажни куќи со европски квалитет — дизајнирани за уживање, изградени за да траат. Модерен дизајн со високи перформанси, погоден за природата.</p>
+      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+        <a class="btn-hero solid" href="#calc">ПРЕСМЕТАЈ ЦЕНА →</a>
+        <a class="btn-hero line" href="#models">МОДЕЛИ</a>
+      </div>
+    </div>
+  </div>
+  <div class="hero-visual" data-reveal="220">
+    <div class="frame"><div class="img-ph">// главна фотографија — екстериер на модуларна куќа</div></div>
+    <div class="hero-badge">
+      <div class="k">MDA СИСТЕМ</div>
+      <div class="v">Комфор до 6 лица · целогодишна употреба</div>
+    </div>
+  </div>
+</header>
+
+<!-- ═══ МАРКИЗА ═══ -->
+<div class="marquee no-print">
+  <div class="track">
+    <span>ISO 9001:2015 <span class="d">◆</span> 100% ИМПРЕГНИРАНА ДРВЕНА ОСНОВА <span class="d">◆</span> ALL SEASON ПАКЕТ <span class="d">◆</span> ТУРНКЕЈ ИСПОРАКА <span class="d">◆</span> ЕВРОПСКИ КВАЛИТЕТ <span class="d">◆</span></span>
+    <span aria-hidden="true">ISO 9001:2015 <span class="d">◆</span> 100% ИМПРЕГНИРАНА ДРВЕНА ОСНОВА <span class="d">◆</span> ALL SEASON ПАКЕТ <span class="d">◆</span> ТУРНКЕЈ ИСПОРАКА <span class="d">◆</span> ЕВРОПСКИ КВАЛИТЕТ <span class="d">◆</span></span>
+  </div>
+</div>
+
+<!-- ═══ ЗА НАС ═══ -->
+<section id="about" class="section-pad no-print" style="scroll-margin-top: 80px;">
+  <div class="about-grid">
+    <div data-reveal="0">
+      <div class="sec-kick">01 / ЗОШТО MDA</div>
+      <h2 class="sec-title">Разбираме наука за градба.</h2>
+    </div>
+    <div data-reveal="120">
+      <p>Произведуваме објекти со класа на светско ниво кои нудат систематски пристап кон модуларноста. Распоредот на просториите е идеална комбинација на перформанси, удобност и приватност.</p>
+      <p>Сите домови се градат според <strong>ISO 9001:2015</strong> стандарди — оптимизирана изолација, дизајн на греење и MDA системот за целогодишен комфор.</p>
+    </div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat" data-reveal="0"><div class="num" data-count="12">0</div><div class="lbl">Години искуство</div></div>
+    <div class="stat" data-reveal="90"><div class="num" data-count="150" data-suffix="+">0</div><div class="lbl">Изградени објекти</div></div>
+    <div class="stat" data-reveal="180"><div class="num" data-count="100" data-suffix="%">0</div><div class="lbl">Импрегнирана основа</div></div>
+    <div class="stat" data-reveal="270"><div class="num" data-count="6">0</div><div class="lbl">Лица комфор</div></div>
+  </div>
+</section>
+
+<!-- ═══ МОДЕЛИ ═══ -->
+<section id="models" class="no-print" style="padding: 0 clamp(20px,5vw,64px) clamp(64px,9vw,120px); scroll-margin-top: 80px;">
+  <div class="models-head" data-reveal="0">
+    <div>
+      <div class="sec-kick">02 / МОДЕЛИ НА КУЌИ</div>
+      <h2 class="sec-title">Изберете основа.</h2>
+    </div>
+    <a href="#calc" class="mono" style="font-size: 13px; color: var(--ink);">Прилагоди во калкулатор →</a>
+  </div>
+  <div class="models-grid" id="modelsGrid"></div>
+</section>
+
+<!-- ═══ КАЛКУЛАТОР — ВИЗАРД ВО 4 ЧЕКОРИ ═══ -->
+<section id="calc" class="calc-dark section-pad no-print">
+  <div data-reveal="0">
+    <div class="sec-kick">03 / КАЛКУЛАТОР НА ЦЕНИ</div>
+    <h2 class="sec-title" style="max-width: 16ch;">Пресметај ја твојата куќа.</h2>
+    <p class="sub" style="max-width: 54ch; margin: 16px 0 0; font-size: 15px; line-height: 1.6;">Во четири чекори добиваш ориентациона цена базирана на реални материјали и работна рака — истата методологија како официјалната МДА пресметка.</p>
+  </div>
+
+  <div class="progress-pills" id="progressPills" data-reveal="60"></div>
+
+  <div class="calc-grid">
+    <!-- ПАНЕЛ СО ЧЕКОРИ -->
+    <div data-reveal="90">
+
+      <!-- ЧЕКОР 1: Површина и систем -->
+      <div class="wiz-step" id="step1">
+        <div class="wiz-block">
+          <div class="range-head">
+            <div class="wiz-label" style="margin: 0;">КВАДРАТУРА НА КУЌА</div>
+            <div class="wiz-value"><span id="houseVal">150</span> <small>m²</small></div>
+          </div>
+          <input class="mda-range" type="range" id="houseRange" min="30" max="400" step="5" value="150">
+          <div class="range-scale"><span>30 m²</span><span>400 m²</span></div>
+        </div>
+        <div class="wiz-block">
+          <div class="range-head">
+            <div class="wiz-label" style="margin: 0;">ТЕРАСА / НАДСТРЕШНИЦА</div>
+            <div class="wiz-value"><span id="terraceVal">12</span> <small>m²</small></div>
+          </div>
+          <input class="mda-range" type="range" id="terraceRange" min="0" max="80" step="1" value="12">
+          <div class="range-scale"><span>0 m²</span><span>80 m²</span></div>
+        </div>
+        <div class="wiz-block">
+          <div class="wiz-label">КОНСТРУКТИВЕН СИСТЕМ</div>
+          <div class="opt-grid c2" id="sysOpts"></div>
+        </div>
+        <details class="adv-details">
+          <summary>ПРЕЦИЗНИ МЕРКИ — автоматски од квадратурата, уредливи ▾</summary>
+          <div class="adv-grid" id="advGrid"></div>
+        </details>
+      </div>
+
+      <!-- ЧЕКОР 2: Клучни ставки -->
+      <div class="wiz-step" id="step2" style="display: none;">
+        <div class="wiz-block">
+          <div class="wiz-label">ПОКРИВ</div>
+          <div class="opt-grid c2" id="roofOpts"></div>
+        </div>
+        <div class="wiz-block">
+          <div class="wiz-label">ФАСАДА</div>
+          <div class="opt-grid c4" id="facOpts"></div>
+        </div>
+        <div class="wiz-block">
+          <div class="wiz-label">ВНАТРЕШНО УРЕДУВАЊЕ</div>
+          <div class="opt-grid c2" id="intOpts"></div>
+        </div>
+        <div class="wiz-block">
+          <div class="wiz-label">СПУШТЕН ПЛАФОН</div>
+          <div class="opt-grid" style="grid-template-columns: minmax(220px, 320px);" id="ceilOpt"></div>
+        </div>
+      </div>
+
+      <!-- ЧЕКОР 3: Инсталации и финиш -->
+      <div class="wiz-step" id="step3" style="display: none;">
+        <div class="wiz-block">
+          <div class="wiz-label">ЕЛЕКТРИКА</div>
+          <div class="opt-grid c3" id="elecOpts"></div>
+        </div>
+        <div class="wiz-block" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+          <div>
+            <div class="wiz-label">БАЊИ (WC)</div>
+            <div class="stepper">
+              <button id="wcDec">−</button><span class="val" id="wcVal">2</span><button class="plus" id="wcInc">+</button>
+            </div>
+          </div>
+          <div>
+            <div class="wiz-label">ВНАТРЕШНИ ВРАТИ</div>
+            <div class="stepper">
+              <button id="doorDec">−</button><span class="val" id="doorVal">6</span><button class="plus" id="doorInc">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="wiz-block">
+          <div class="wiz-label">ПОДОВИ</div>
+          <div class="opt-grid c3" id="floorOpts"></div>
+        </div>
+        <div class="wiz-block">
+          <div class="wiz-label">ПРОЗОРИ И ВРАТИ (ДОГРАМА)</div>
+          <p style="font-size: 13px; color: #b9b3aa; margin: 0 0 10px; line-height: 1.5;">Стандарден сет прозори и врати, автоматски скалиран според квадратурата — <span id="winFactorNote" class="mono" style="color: var(--accent-soft);"></span></p>
+          <button class="btn ghost small" id="editWinBtn" style="border-color: #4a453e; color: #fff;">Уреди листа ▾</button>
+          <div class="win-editor" id="winEditor" style="display: none;">
+            <table class="data" id="winTable">
+              <thead><tr><th>#</th><th>Опис</th><th class="num">Кол.</th><th class="num">Цена ЕУР</th><th></th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <div style="padding: 8px 4px 2px; display: flex; gap: 10px;">
+              <button class="btn ghost small" id="addWin">+ Додади ред</button>
+              <button class="btn ghost small" id="resetWin">↺ Врати автоматски сет</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ЧЕКОР 4: Резиме -->
+      <div class="wiz-step" id="step4" style="display: none;">
+        <div style="font-family: var(--disp); font-weight: 700; font-size: 22px; margin-bottom: 20px;">Вашата конфигурација</div>
+        <div id="recapLines"></div>
+        <div class="recap-total">
+          <div class="row"><span style="color: #b9b3aa; font-size: 14px;">Сива фаза</span><span style="font-family: var(--disp); font-weight: 700; font-size: 18px;" id="recapGrey">—</span></div>
+          <div class="row"><span style="color: #fff; font-size: 15px; font-weight: 600;">Турнкеј (клуч на рака)</span><span style="font-family: var(--disp); font-weight: 700; font-size: 22px; color: var(--accent-soft);" id="recapTotal">—</span></div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 160px; gap: 12px; margin-top: 24px;">
+          <div>
+            <div class="wiz-label" style="margin-bottom: 8px;">ПОНУДА ЗА (КЛИЕНТ)</div>
+            <input type="text" class="dark-input" id="clientName" placeholder="Име и презиме">
+          </div>
+          <div>
+            <div class="wiz-label" style="margin-bottom: 8px;">ПОПУСТ (ЕУР)</div>
+            <input type="number" class="dark-input mono" id="discount" value="0" min="0">
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px; margin-top: 18px; flex-wrap: wrap;">
+          <button class="btn accent" id="printBtn">Печати понуда</button>
+          <button class="btn ghost" id="saveBtn" style="border-color: #4a453e; color: #fff;">Зачувај понуда</button>
+          <span id="saveNote" class="mono" style="font-size: 11.5px; color: #b9b3aa; align-self: center;"></span>
+        </div>
+        <details class="detail-details">
+          <summary>ДЕТАЛНА СПЕЦИФИКАЦИЈА ПО МАТЕРИЈАЛИ ▾</summary>
+          <div class="detail-wrap">
+            <table class="data" id="detailTable">
+              <thead><tr><th>Код</th><th>Опис</th><th>Ед.м</th><th class="num">Кол.</th><th class="num">Ед. цена МКД</th><th class="num">Вкупно МКД</th><th class="num">ЕУР</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </details>
+        <p style="font-size: 12px; color: var(--muted); line-height: 1.55; margin: 18px 0 0;">*Ориентациона цена со ДДВ (<span id="vatNote">18</span>%), без фундамент, земјиште и подготвителни работи. Финалната понуда се потврдува по увид на локација и проект.</p>
+        <div id="calcErrors" style="margin-top: 14px;"></div>
+      </div>
+
+      <!-- НАВИГАЦИЈА НА ВИЗАРДОТ -->
+      <div class="wiz-nav">
+        <div><button class="back" id="backBtn" style="visibility: hidden;">← Назад</button></div>
+        <button class="next" id="nextBtn">Следно →</button>
+      </div>
+    </div>
+
+    <!-- РЕЗИМЕ ПАНЕЛ (секогаш видлив) -->
+    <div class="sum-panel" data-reveal="170">
+      <div class="k">ПРОЦЕНЕТА ЦЕНА · ТУРНКЕЈ</div>
+      <div class="big" id="sumTotal">€0</div>
+      <div class="mkd" id="sumMkd">≈ 0 ден · со ДДВ</div>
+      <div class="sum-tiles">
+        <div class="tile"><div class="tk">ЦЕНА / m²</div><div class="tv" id="sumPerM2">—</div></div>
+        <div class="tile"><div class="tk">СИВА ФАЗА</div><div class="tv" id="sumGrey">—</div></div>
+      </div>
+      <div class="sum-lines" id="sumLines"></div>
+      <button class="sum-cta" id="sumCta">ПОБАРАЈ ПОНУДА →</button>
+      <p style="font-size: 11px; color: var(--muted); line-height: 1.5; margin: 14px 0 0;">Цените се ориентациони и базирани на реални материјали. Финалната понуда зависи од локација и спецификации.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ КОНТАКТ / ФУТЕР ═══ -->
+<footer id="contact" class="section-pad no-print" style="padding-bottom: clamp(36px,4vw,56px); scroll-margin-top: 80px;">
+  <div class="footer-grid" data-reveal="0">
+    <div>
+      <div class="sec-kick">04 / КОНТАКТ</div>
+      <h2>Замислете го<br>вашиот дом.</h2>
+    </div>
+    <div class="contact-links">
+      <a href="tel:+38971336108" id="phoneFoot"><span>071 336 108</span><span>→</span></a>
+      <a class="soft" href="mailto:info@modulardesignarchitects.com"><span>info@modulardesignarchitects.com</span><span>→</span></a>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 22px; color: var(--ink-soft); font-size: 14px;"><span>ул. Шарски Одред бр.5, Скопје</span></div>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 MODULAR DESIGN ARCHITECTS</span>
+    <span>ПОМАЛКУ КУЌА, ПОВЕЌЕ ДОМ</span>
+  </div>
+</footer>
+
+<div id="offerPrint"></div>
+
+<script src="js/engine.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

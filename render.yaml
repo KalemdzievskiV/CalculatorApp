@@ -1,0 +1,14 @@
+# Render Blueprint — бесплатен деплој на MDA Калкулатор.
+# Претпоставува дека GitHub репото го содржи ова `app/` како корен.
+# Можеш и рачно преку Render UI (види DEPLOY.md) — тогаш овој фајл не е потребен.
+services:
+  - type: web
+    name: mda-calculator
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /healthz
+    envVars:
+      - key: MDA_ADMIN_PASSWORD
+        sync: false   # Render ќе те праша да ја внесеш лозинката при деплој

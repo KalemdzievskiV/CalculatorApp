@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Админ — MDA Калкулатор</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .admin-wrap { padding: 26px clamp(20px, 4vw, 56px) 80px; }
+  .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: 18px 0 22px; flex-wrap: wrap; }
+  .tabs button {
+    background: none; border: none; border-bottom: 2px solid transparent; padding: 10px 16px;
+    font-family: var(--disp); font-size: 13.5px; font-weight: 600; letter-spacing: .02em;
+    color: var(--ink-soft); cursor: pointer;
+  }
+  .tabs button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 14px; flex-wrap: wrap; }
+  .toolbar input[type=text], .toolbar select { padding: 8px 10px; font-family: var(--mono); font-size: 13px; border: 1px solid var(--line); border-radius: 2px; background: #fff; }
+  #loginScreen { min-height: 100vh; display: grid; place-items: center; }
+  .login-card { width: 340px; }
+  .formula-input { font-family: var(--mono) !important; font-size: 12.5px !important; }
+  .hint { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+  .hint code { background: var(--panel); padding: 1px 5px; border-radius: 2px; font-size: 11px; }
+  td .icon-btn { background: none; border: none; cursor: pointer; font-size: 15px; padding: 2px 6px; color: var(--ink-soft); }
+  td .icon-btn:hover { color: var(--accent); }
+  .save-flash { position: fixed; bottom: 20px; right: 20px; background: var(--dark); color: #fff; padding: 10px 18px; border-radius: 3px; font-size: 13px; opacity: 0; transition: opacity .25s; pointer-events: none; z-index: 200; }
+  .save-flash.show { opacity: 1; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div class="card login-card">
+    <div class="card-head"><h3>MDA Админ панел</h3></div>
+    <div class="card-body" style="display: grid; gap: 12px;">
+      <div class="field"><label>Лозинка</label><input type="password" id="pw" placeholder="••••••••"></div>
+      <button class="btn accent" id="loginBtn" style="justify-content: center;">Најави се</button>
+      <div id="loginErr" class="error-note" style="display: none;"></div>
+      <div class="hint">Стандардна лозинка: <code>admin123</code></div>
+    </div>
+  </div>
+</div>
+
+<div id="adminApp" style="display: none;">
+  <nav class="nav">
+    <a class="brand" href="index.html"><span class="logo">M</span><span>MODULAR DESIGN — АДМИН</span></a>
+    <div class="links">
+      <a href="index.html">← Кон калкулаторот</a>
+      <a href="#" id="logoutBtn">Одјава</a>
+    </div>
+  </nav>
+
+  <div class="admin-wrap">
+    <div class="kicker">УПРАВУВАЊЕ СО ПРЕСМЕТКАТА</div>
+    <h1 class="display" style="font-size: clamp(26px, 3vw, 42px);">Материјали, цени и формули.</h1>
+    <p class="sub">Сè што влегува во цената на една куќа се уредува овде — категории, материјали, единечни цени, формули за количина и влезни параметри на калкулаторот.</p>
+
+    <div class="tabs">
+      <button data-tab="materials" class="active">МАТЕРИЈАЛИ</button>
+      <button data-tab="categories">КАТЕГОРИИ</button>
+      <button data-tab="inputs">ПАРАМЕТРИ</button>
+      <button data-tab="windows">ДОГРАМА</button>
+      <button data-tab="quotes">ПОНУДИ</button>
+      <button data-tab="settings">ПОДЕСУВАЊА</button>
+    </div>
+
+    <!-- МАТЕРИЈАЛИ -->
+    <div class="tab-panel active" id="tab-materials">
+      <div class="toolbar">
+        <input type="text" id="matSearch" placeholder="Барај материјал…" style="width: 240px;">
+        <select id="matCatFilter"><option value="">Сите категории</option></select>
+        <span style="flex: 1;"></span>
+        <button class="btn accent small" id="addMat">+ Нов материјал</button>
+      </div>
+      <div class="card" style="overflow-x: auto;">
+        <table class="data" id="matTable">
+          <thead><tr>
+            <th>Код</th><th>Материјал</th><th>Категорија</th><th>Ед.м</th>
+            <th class="num">Цена МКД (со ДДВ)</th><th>Количина</th><th>Статус</th><th></th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- КАТЕГОРИИ -->
+    <div class="tab-panel" id="tab-categories">
+      <div class="toolbar">
+        <span class="hint">Категориите го групираат ценовникот и рекапитуларот. Бришењето е можно само ако нема материјали во категоријата.</span>
+        <span style="flex: 1;"></span>
+        <button class="btn accent small" id="addCat">+ Нова категорија</button>
+      </div>
+      <div class="card"><table class="data" id="catTable">
+        <thead><tr><th style="width:40px;"></th><th>ID</th><th>Име</th><th class="num">Материјали</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <!-- ПАРАМЕТРИ -->
+    <div class="tab-panel" id="tab-inputs">
+      <div class="toolbar">
+        <span class="hint">Влезните параметри се полињата што клиентот ги пополнува во калкулаторот. Клучот се користи во формулите на материјалите.</span>
+        <span style="flex: 1;"></span>
+        <button class="btn accent small" id="addInput">+ Нов параметар</button>
+      </div>
+      <div class="card" style="overflow-x: auto;"><table class="data" id="inputTable">
+        <thead><tr><th>Клуч</th><th>Име</th><th>Група</th><th>Тип</th><th class="num">Стандардно</th><th>Ед.</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <!-- ДОГРАМА -->
+    <div class="tab-panel" id="tab-windows">
+      <div class="toolbar">
+        <span class="hint">Стандардни прозори и врати што се појавуваат како почетни редови во калкулаторот (цена во ЕУР по парче).</span>
+        <span style="flex: 1;"></span>
+        <button class="btn accent small" id="addWinDef">+ Нов ред</button>
+      </div>
+      <div class="card"><table class="data" id="winDefTable">
+        <thead><tr><th>#</th><th>Опис</th><th class="num">Количина</th><th class="num">Цена ЕУР</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <!-- ПОНУДИ -->
+    <div class="tab-panel" id="tab-quotes">
+      <div class="card"><table class="data" id="quoteTable">
+        <thead><tr><th>Датум</th><th>Клиент</th><th class="num">Вкупно ЕУР</th><th></th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </div>
+
+    <!-- ПОДЕСУВАЊА -->
+    <div class="tab-panel" id="tab-settings">
+      <div class="card" style="max-width: 460px;">
+        <div class="card-head"><h3>Општи подесувања</h3></div>
+        <div class="card-body" style="display: grid; gap: 14px;">
+          <div class="field"><label>Име на компанија</label><input type="text" id="setCompany"></div>
+          <div class="field"><label>Телефон</label><input type="text" id="setPhone"></div>
+          <div class="field"><label>ДДВ %</label><input type="number" step="any" id="setVat"></div>
+          <div class="field"><label>Курс МКД / ЕУР</label><input type="number" step="any" id="setRate"></div>
+          <div class="field"><label>Нова админ лозинка (празно = без промена)</label><input type="password" id="setPw"></div>
+          <button class="btn accent" id="saveSettings" style="justify-self: start;">Зачувај подесувања</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Модал за материјал -->
+<div class="modal-back" id="matModal">
+  <div class="modal">
+    <div class="modal-head"><h3 id="matModalTitle">Материјал</h3><button class="x-close" data-close>×</button></div>
+    <div class="modal-body">
+      <div style="display: grid; grid-template-columns: 130px 1fr; gap: 12px;">
+        <div class="field"><label>Код</label><input type="text" id="mCode"></div>
+        <div class="field"><label>Име</label><input type="text" id="mName"></div>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 110px 150px; gap: 12px;">
+        <div class="field"><label>Категорија</label><select id="mCat"></select></div>
+        <div class="field"><label>Ед. мера</label><input type="text" id="mUnit"></div>
+        <div class="field"><label>Цена МКД (со ДДВ)</label><input type="number" step="any" id="mPrice"></div>
+      </div>
+      <div class="field">
+        <label>Формула за количина (празно = фиксна количина)</label>
+        <textarea id="mFormula" class="formula-input" rows="2" spellcheck="false"></textarea>
+        <div id="mFormulaCheck" class="hint" style="margin-top: 5px;"></div>
+      </div>
+      <div style="display: grid; grid-template-columns: 150px 150px 1fr; gap: 12px;">
+        <div class="field"><label>Фиксна количина</label><input type="number" step="any" id="mDefQty"></div>
+        <div class="field"><label>Фактор сива фаза</label><input type="number" step="any" id="mGrey"></div>
+        <div class="field" style="align-self: end;"><label class="toggle" id="mActive" style="margin: 0;"><span class="t-label">Активен</span><span class="knob"></span></label></div>
+      </div>
+      <div class="field">
+        <label>Формула за цена (напредно, празно = фиксна цена)</label>
+        <textarea id="mPriceFormula" class="formula-input" rows="2" spellcheck="false"></textarea>
+      </div>
+      <div class="hint">
+        Во формулите може да користите: влезни параметри (<code>AREA</code>, <code>WALL_OUT</code>, <code>WC</code>…),
+        количини од други ставки <code>qty("K01")</code>, износи <code>total("EM01")</code>,
+        оператори <code>+ − * / ( )</code> и <code>min max round ceil floor abs</code>.
+        <span id="varList"></span>
+      </div>
+      <div id="mTest" class="mono" style="font-size: 12.5px;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn danger small" id="mDelete">Избриши</button>
+      <span style="flex: 1;"></span>
+      <button class="btn ghost" data-close>Откажи</button>
+      <button class="btn accent" id="mSave">Зачувај</button>
+    </div>
+  </div>
+</div>
+
+<div class="save-flash" id="flash">Зачувано ✓</div>
+
+<script src="js/engine.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
