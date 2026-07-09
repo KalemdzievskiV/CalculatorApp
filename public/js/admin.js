@@ -384,6 +384,43 @@
     flash();
   };
 
+  // ══ РЕЗЕРВНА КОПИЈА / ПРЕНОС ══
+  $('#exportBtn').onclick = async () => {
+    const r = await fetch('/api/admin/export', { headers: { Authorization: 'Bearer ' + token } });
+    if (!r.ok) { $('#backupNote').textContent = 'Грешка при извоз.'; return; }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'mda-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    $('#backupNote').textContent = 'Симната резервна копија ✓';
+  };
+  $('#importBtn').onclick = () => $('#importFile').click();
+  $('#importFile').onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const note = $('#backupNote');
+    try {
+      const data = JSON.parse(await file.text());
+      if (!confirm('Ова ќе ја замени ЦЕЛАТА тековна база со податоците од датотеката. Продолжи?')) { e.target.value = ''; return; }
+      const res = await api('/api/admin/import', 'POST', data);
+      if (res && res.ok) {
+        note.style.color = '#2e7d32';
+        note.textContent = 'Внесени ' + res.materials + ' материјали ✓ — се вчитува повторно…';
+        setTimeout(() => location.reload(), 900);
+      } else {
+        note.style.color = 'var(--accent)';
+        note.textContent = (res && res.error) || 'Внесот не успеа.';
+      }
+    } catch (err) {
+      note.style.color = 'var(--accent)';
+      note.textContent = 'Датотеката не е валиден JSON.';
+    }
+    e.target.value = '';
+  };
+
   // ── Стартување ──
   async function boot() {
     cfg = await fetch('/api/config').then((r) => r.json());

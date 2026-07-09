@@ -157,6 +157,19 @@
           <button class="btn accent" id="saveSettings" style="justify-self: start;">Зачувај подесувања</button>
         </div>
       </div>
+
+      <div class="card" style="max-width: 460px; margin-top: 16px;">
+        <div class="card-head"><h3>Резервна копија и пренос</h3></div>
+        <div class="card-body" style="display: grid; gap: 12px;">
+          <p class="hint">Целата база е една датотека. Симни ја за резервна копија или за пренос на друг сервер, потоа внеси ја таму. При внес, тековната админ лозинка се задржува.</p>
+          <button class="btn ghost" id="exportBtn">⬇ Симни резервна копија (.json)</button>
+          <div>
+            <input type="file" id="importFile" accept="application/json,.json" style="display: none;">
+            <button class="btn ghost" id="importBtn">⬆ Внеси резервна копија…</button>
+          </div>
+          <span id="backupNote" class="hint"></span>
+        </div>
+      </div>
     </div>
   </div>
 </div>

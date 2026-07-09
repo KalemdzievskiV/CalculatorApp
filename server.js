@@ -20,9 +20,12 @@ fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
 let db;
 if (fs.existsSync(DB_FILE)) {
   db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
+  console.log(`✔ База ВЧИТАНА од постоечка датотека: ${DB_FILE} (податоците се зачувани).`);
 } else {
   db = JSON.parse(JSON.stringify(require('./data/seed.js'))); // длабока копија на seed
   saveDb();
+  console.log(`⚠ Нема постоечка база — СОЗДАДЕНА од seed на: ${DB_FILE}.`);
+  console.log(`  Ако ова се појавува по СЕКОЈ редеплој, значи ${path.dirname(DB_FILE)} НЕ е на постојан Railway Volume — измените нема да се чуваат.`);
 }
 function saveDb() {
   const tmp = DB_FILE + '.tmp';
@@ -189,6 +192,32 @@ const server = http.createServer(async (req, res) => {
         db.inquiries = (db.inquiries || []).filter((q) => q.id !== delInq[1]);
         saveDb();
         return json(res, 200, { ok: true });
+      }
+
+      // Извоз на целата база (за резервна копија / пренос на друг сервер) — без лозинката
+      if (what === 'export' && req.method === 'GET') {
+        const { adminPassword, ...settings } = db.settings;
+        const dump = Object.assign({}, db, { settings });
+        const fname = 'mda-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Content-Disposition': 'attachment; filename="' + fname + '"',
+        });
+        return res.end(JSON.stringify(dump, null, 2));
+      }
+      // Внес на резервна копија — ја заменува целата база (ја задржува тековната лозинка)
+      if (what === 'import' && req.method === 'POST') {
+        const body = await readBody(req);
+        if (!body || !Array.isArray(body.materials) || !Array.isArray(body.categories) || !Array.isArray(body.inputs)) {
+          return json(res, 400, { error: 'Неважечка резервна копија (недостасуваат materials/categories/inputs).' });
+        }
+        const keepPw = db.settings.adminPassword;
+        db = body;
+        db.settings = Object.assign({}, body.settings || {}, { adminPassword: keepPw });
+        db.quotes = Array.isArray(db.quotes) ? db.quotes : [];
+        db.inquiries = Array.isArray(db.inquiries) ? db.inquiries : [];
+        saveDb();
+        return json(res, 200, { ok: true, materials: db.materials.length });
       }
 
       // Колекции: PUT ја заменува целата колекција (админот уредува локално и зачувува)
