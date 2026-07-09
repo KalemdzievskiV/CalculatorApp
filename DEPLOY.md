@@ -62,15 +62,46 @@ before you start:
 
 ---
 
-## Making it permanent (data survives restarts)
+## Railway (railway.com)
 
-If you want admin edits and saved quotes to persist and the site to stay always-on,
-you need a host with a **persistent volume** mounted at `/data`. Any of these work with
-the included `Dockerfile` (which already sets `MDA_DB_FILE=/data/db.json`):
+The repo already contains everything Railway needs: a `Dockerfile` and a `railway.json`
+(builder + healthcheck at `/healthz` + restart policy). **No code changes are required** —
+the server already listens on Railway's injected `PORT` on `0.0.0.0`.
+
+Steps:
+
+1. **Push the `app/` folder to GitHub** (private repo — the pricing lives here):
+   ```bash
+   cd app
+   git init && git add -A && git commit -m "MDA calculator"
+   git branch -M main
+   git remote add origin https://github.com/<you>/<repo>.git
+   git push -u origin main
+   ```
+2. On **railway.com** → **New Project → Deploy from GitHub repo** → pick the repo.
+   Railway detects the Dockerfile and builds it automatically.
+   *(If you pushed the whole project instead of just `app/`, open the service’s
+   **Settings → Root Directory** and set it to `app`.)*
+3. **Add a Volume** (service → **Variables/Settings → Volumes → New Volume**) with
+   **mount path `/data`**. This is what makes admin edits and saved quotes survive
+   restarts and redeploys. `MDA_DB_FILE` is already set to `/data/db.json` in the Dockerfile.
+4. **Add a variable**: `MDA_ADMIN_PASSWORD` = a strong password (your admin login).
+   You do **not** need to set `PORT` — Railway injects it.
+5. Deploy. Under **Settings → Networking → Generate Domain** to get a public URL like
+   `https://mda-calculator-production.up.railway.app`. Admin panel is at `…/admin.html`.
+
+Notes:
+- Railway isn’t free long-term — new accounts get trial credit (fine for a client demo),
+  then it’s the Hobby plan (a few $/month), which also unlocks the persistent volume.
+- If you skip the volume, the site still works perfectly (calculator always loads correct
+  seed pricing), but admin edits/quotes reset on each redeploy.
+
+## Other permanent hosts (data survives restarts)
+
+Any host with a **persistent volume** mounted at `/data` works with the same `Dockerfile`:
 
 - **Fly.io** — free small volume, stays awake. More command-line driven (`flyctl launch`).
-- **Railway** — very simple UI, add a volume + the env var. Usage-based (a few $/mo).
-- **Render paid tier** — same steps as above but a paid instance + an attached Disk at `/data`.
+- **Render paid tier** — a paid instance + an attached Disk at `/data`.
 
 ### Test the container locally
 ```bash

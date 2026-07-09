@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Modular Design Architects — Монтажни куќи</title>
+<title>МОНТАЖНИ КУЌИ | Modular Design Architects | Скопје</title>
+<meta name="description" content="Монтажни куќи со европски квалитет — дизајнирани за уживање, изградени за да траат. Помалку куќа, повеќе дом.">
+<link rel="icon" href="assets/mda-logo-256.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -11,89 +13,176 @@
 </head>
 <body>
 
+<!-- ═══ ИЗВЕСТУВАЊЕ ═══ -->
+<div class="notice-bar no-print" id="noticeBar">
+  <span class="notice-dot">●</span>
+  <span>Поради тековните промени со цените на нафтените деривати, цените на моделите се покачуваат околу <strong>15–20%</strong> — заклучно до <strong>03.04.2026</strong>.</span>
+  <button class="notice-x" id="noticeClose" aria-label="Затвори">×</button>
+</div>
+
 <!-- ═══ НАВИГАЦИЈА ═══ -->
-<nav class="nav no-print">
-  <a class="brand" href="#home"><span class="logo">M</span><span>MODULAR DESIGN</span></a>
-  <div class="links">
+<nav class="nav nav-hero no-print" id="siteNav">
+  <a class="brand" href="#home">
+    <img class="nav-logo" src="assets/mda-logo-256.png" alt="Modular Design Architects">
+    <span>MODULAR DESIGN</span>
+  </a>
+  <div class="links" id="navLinks">
     <a href="#about">ЗА НАС</a>
+    <a href="#services">УСЛУГИ</a>
     <a href="#models">МОДЕЛИ</a>
     <a href="#calc">КАЛКУЛАТОР</a>
+    <a href="#education">ЕДУКАЦИЈА</a>
+    <a href="#faq">FAQ</a>
     <a href="#contact">КОНТАКТ</a>
-    <a href="admin.html" style="color: var(--muted);">АДМИН</a>
   </div>
-  <a class="cta" id="phoneCta" href="tel:+38971336108">071 336 108</a>
+  <div class="nav-right">
+    <div class="lang-switch">
+      <a class="active" href="https://www.modulardesignarchitects.com/">МК</a>
+      <a href="https://en.modulardesignarchitects.com/">EN</a>
+      <a href="https://hr.modulardesignarchitects.com/">HR</a>
+    </div>
+    <a class="cta" id="phoneCta" href="tel:+38971336108">071 336 108</a>
+    <button class="nav-burger" id="navBurger" aria-label="Мени">☰</button>
+  </div>
 </nav>
 
-<!-- ═══ ХЕРО ═══ -->
+<!-- ═══ ХЕРО (100vh, навигацијата се прелева над него) ═══ -->
 <header id="home" class="hero-land no-print">
-  <div class="hero-meta">
-    <span>ISO 9001:2015</span><span class="d" style="color: var(--accent);">/</span>
-    <span>СКОПЈЕ · МК</span><span style="color: var(--accent);">/</span>
-    <span>МОНТАЖНИ КУЌИ</span>
-  </div>
-  <div class="hero-grid">
-    <h1 data-reveal="80">ПОМАЛКУ<br>КУЌА,<br><span class="acc">ПОВЕЌЕ</span> ДОМ</h1>
-    <div data-reveal="160">
-      <p>Монтажни куќи со европски квалитет — дизајнирани за уживање, изградени за да траат. Модерен дизајн со високи перформанси, погоден за природата.</p>
-      <div style="display: flex; gap: 12px; flex-wrap: wrap;">
-        <a class="btn-hero solid" href="#calc">ПРЕСМЕТАЈ ЦЕНА →</a>
-        <a class="btn-hero line" href="#models">МОДЕЛИ</a>
-      </div>
+  <div class="hero-bg"><div class="img-ph">// главна фотографија — екстериер на модуларна куќа</div></div>
+  <div class="hero-inner" data-reveal="80">
+    <div class="hero-meta">
+      <span>— MODULAR HOUSES —</span><span class="d">/</span>
+      <span>ISO 9001:2015</span><span class="d">/</span>
+      <span>СКОПЈЕ · МК</span>
+    </div>
+    <h1 class="hero-title">ПОМАЛКУ<br>КУЌА,<br><span class="acc">ПОВЕЌЕ</span> ДОМ</h1>
+    <p class="hero-lead">Монтажни куќи со европски квалитет — дизајнирани за уживање, изградени за да траат. Модерен дизајн со високи перформанси, создаден и погоден за природата.</p>
+    <div class="hero-cta">
+      <a class="btn-hero solid" href="#calc">ПРЕСМЕТАЈ ЦЕНА →</a>
+      <a class="btn-hero line" href="#models">КЛИКНИ ЗА МОДЕЛИ</a>
     </div>
   </div>
-  <div class="hero-visual" data-reveal="220">
-    <div class="frame"><div class="img-ph">// главна фотографија — екстериер на модуларна куќа</div></div>
-    <div class="hero-badge">
-      <div class="k">MDA СИСТЕМ</div>
-      <div class="v">Комфор до 6 лица · целогодишна употреба</div>
-    </div>
+  <div class="hero-badge">
+    <div class="k">MDA СИСТЕМ</div>
+    <div class="v">Бескомпромисен дом до 6 лица · целогодишна употреба</div>
   </div>
+  <a class="hero-scroll" href="#about" aria-label="Надолу">↓</a>
 </header>
 
 <!-- ═══ МАРКИЗА ═══ -->
 <div class="marquee no-print">
   <div class="track">
-    <span>ISO 9001:2015 <span class="d">◆</span> 100% ИМПРЕГНИРАНА ДРВЕНА ОСНОВА <span class="d">◆</span> ALL SEASON ПАКЕТ <span class="d">◆</span> ТУРНКЕЈ ИСПОРАКА <span class="d">◆</span> ЕВРОПСКИ КВАЛИТЕТ <span class="d">◆</span></span>
-    <span aria-hidden="true">ISO 9001:2015 <span class="d">◆</span> 100% ИМПРЕГНИРАНА ДРВЕНА ОСНОВА <span class="d">◆</span> ALL SEASON ПАКЕТ <span class="d">◆</span> ТУРНКЕЈ ИСПОРАКА <span class="d">◆</span> ЕВРОПСКИ КВАЛИТЕТ <span class="d">◆</span></span>
+    <span>ISO 9001:2015 <span class="d">◆</span> 100% ИМПРЕГНИРАНА ДРВЕНА ОСНОВА <span class="d">◆</span> ALL SEASON ПАКЕТ <span class="d">◆</span> ТУРНКЕЈ ИСПОРАКА <span class="d">◆</span> 5 ГОДИНИ ГАРАНЦИЈА <span class="d">◆</span> ЕВРОПСКИ КВАЛИТЕТ <span class="d">◆</span></span>
+    <span aria-hidden="true">ISO 9001:2015 <span class="d">◆</span> 100% ИМПРЕГНИРАНА ДРВЕНА ОСНОВА <span class="d">◆</span> ALL SEASON ПАКЕТ <span class="d">◆</span> ТУРНКЕЈ ИСПОРАКА <span class="d">◆</span> 5 ГОДИНИ ГАРАНЦИЈА <span class="d">◆</span> ЕВРОПСКИ КВАЛИТЕТ <span class="d">◆</span></span>
   </div>
 </div>
 
 <!-- ═══ ЗА НАС ═══ -->
-<section id="about" class="section-pad no-print" style="scroll-margin-top: 80px;">
+<section id="about" class="section-pad no-print" style="scroll-margin-top: calc(var(--notice-h, 0px) + 78px);">
   <div class="about-grid">
     <div data-reveal="0">
-      <div class="sec-kick">01 / ЗОШТО MDA</div>
-      <h2 class="sec-title">Разбираме наука за градба.</h2>
+      <div class="sec-kick">01 / ЗА НАС</div>
+      <h2 class="sec-title">Живеење без<br>компромиси.</h2>
     </div>
     <div data-reveal="120">
-      <p>Произведуваме објекти со класа на светско ниво кои нудат систематски пристап кон модуларноста. Распоредот на просториите е идеална комбинација на перформанси, удобност и приватност.</p>
-      <p>Сите домови се градат според <strong>ISO 9001:2015</strong> стандарди — оптимизирана изолација, дизајн на греење и MDA системот за целогодишен комфор.</p>
+      <p>Дизајниравме производ што е компатибилен дом за високи и ниски температури — квалитетна премиум конструкција со високо ниво на изолација. MODULAR DESIGN ARCHITECTS домот може да издржи и тежина на снежна обвивка на планините, но е совршен и за на плажа или крај езеро, каде било на континентот, без оглед на условите.</p>
+      <p>Вашиот MDA дом е бескомпромисен и удобен дом до 6 лица — распореден во соби за одмор, трпезарија, бања, кујна и дневен простор. Замислете го вашиот совршен поглед.</p>
     </div>
   </div>
   <div class="stats-grid">
     <div class="stat" data-reveal="0"><div class="num" data-count="12">0</div><div class="lbl">Години искуство</div></div>
     <div class="stat" data-reveal="90"><div class="num" data-count="150" data-suffix="+">0</div><div class="lbl">Изградени објекти</div></div>
-    <div class="stat" data-reveal="180"><div class="num" data-count="100" data-suffix="%">0</div><div class="lbl">Импрегнирана основа</div></div>
+    <div class="stat" data-reveal="180"><div class="num" data-count="5">0</div><div class="lbl">Години гаранција</div></div>
     <div class="stat" data-reveal="270"><div class="num" data-count="6">0</div><div class="lbl">Лица комфор</div></div>
   </div>
 </section>
 
+<!-- ═══ ПЕРФОРМАНСИ ═══ -->
+<section id="performance" class="section-pad no-print" style="background: var(--panel); scroll-margin-top: calc(var(--notice-h, 0px) + 78px);">
+  <div data-reveal="0" style="max-width: 60ch;">
+    <div class="sec-kick">02 / ПЕРФОРМАНСИ</div>
+    <h2 class="sec-title">Разбираме наука за градба.</h2>
+    <p style="font-size: clamp(15px,1.2vw,18px); line-height: 1.7; color: #40444a; margin: 22px 0 0;">Произведуваме објекти со класа на светско ниво кои нудат систематски пристап кон модуларноста. Нашите градежни методи и модуларни системи овозможуваат комфорен и функционален простор — идеална комбинација на перформанси, удобност и приватност. Дизајниран за уживање, изграден за да трае.</p>
+  </div>
+  <div class="perf-grid">
+    <div class="perf-card" data-reveal="0">
+      <div class="perf-n">ISO 9001:2015</div>
+      <h3>Сертифициран квалитет</h3>
+      <p>Сите домови се градат според ISO 9001:2015 стандарди, со оптимизирана употреба на изолациони материјали и дизајн на греење.</p>
+    </div>
+    <div class="perf-card" data-reveal="90">
+      <div class="perf-n">ALL SEASON</div>
+      <h3>Целогодишен комфор</h3>
+      <p>MDA домовите се соодветни за употреба во текот на целата година, со опционален MDA all-season пакет за екстремни услови.</p>
+    </div>
+    <div class="perf-card" data-reveal="180">
+      <div class="perf-n">ЕФИКАСНОСТ</div>
+      <h3>Оптимизирано греење</h3>
+      <p>Прецизно инженерско тестирање, софистицирано управување со протокот на воздух, добра вентилација и можност за климатизација.</p>
+    </div>
+    <div class="perf-card" data-reveal="270">
+      <div class="perf-n">100% ДРВО</div>
+      <h3>Импрегнирана основа</h3>
+      <p>100% импрегнирана дрвена основа, дополнително издржлива на вода, со гредна поддршка кај точките на потпирање.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ УСЛУГИ ═══ -->
+<section id="services" class="section-pad no-print" style="scroll-margin-top: calc(var(--notice-h, 0px) + 78px);">
+  <div data-reveal="0">
+    <div class="sec-kick">03 / УСЛУГИ</div>
+    <h2 class="sec-title">Што работиме.</h2>
+  </div>
+  <div class="services-grid">
+    <div class="service-card" data-reveal="0">
+      <div class="svc-num">01</div>
+      <h3>Проектирање</h3>
+      <p>Проектирање на идејни решенија за индивидуални и колективни домувања.</p>
+    </div>
+    <div class="service-card" data-reveal="120">
+      <div class="svc-num">02</div>
+      <h3>Изведба</h3>
+      <p>Изведба на објекти од висококвалитетна градба — до клуч на рака, спремни за живеење.</p>
+    </div>
+    <div class="service-card" data-reveal="240">
+      <div class="svc-num">03</div>
+      <h3>Консултантски услуги</h3>
+      <p>Консултација за вашиот нов дом, решение или пренамена — со нашите архитекти во канцеларија.</p>
+    </div>
+  </div>
+</section>
+
 <!-- ═══ МОДЕЛИ ═══ -->
-<section id="models" class="no-print" style="padding: 0 clamp(20px,5vw,64px) clamp(64px,9vw,120px); scroll-margin-top: 80px;">
+<section id="models" class="no-print" style="padding: clamp(48px,7vw,90px) clamp(20px,5vw,64px) clamp(48px,7vw,90px); background: var(--panel); scroll-margin-top: calc(var(--notice-h, 0px) + 78px);">
   <div class="models-head" data-reveal="0">
     <div>
-      <div class="sec-kick">02 / МОДЕЛИ НА КУЌИ</div>
+      <div class="sec-kick">04 / МОДЕЛИ НА КУЌИ</div>
       <h2 class="sec-title">Изберете основа.</h2>
     </div>
-    <a href="#calc" class="mono" style="font-size: 13px; color: var(--ink);">Прилагоди во калкулатор →</a>
+    <div style="text-align: right;">
+      <div class="promo-badge">PROMO ЦЕНА · ОД 500 €/m²</div>
+      <a href="#calc" class="mono" style="font-size: 13px; color: var(--ink); display: block; margin-top: 10px;">Прилагоди во калкулатор →</a>
+    </div>
   </div>
   <div class="models-grid" id="modelsGrid"></div>
+  <div class="model-strip" data-reveal="0">
+    <span class="strip-label">Дел од нашите модели:</span>
+    <span class="tag">MDA SIP100 · 100m²</span>
+    <span class="tag">MDA 54 · 60m²</span>
+    <span class="tag">MDA INA · 96m²</span>
+    <span class="tag">MDA 141 · 141m²</span>
+    <span class="tag">MDA 116 · 160m²</span>
+    <span class="tag">MDA 170B · 170m²</span>
+    <span class="tag">MDA MIA · 306m²</span>
+    <span class="tag">MDA 18 · 20m²</span>
+  </div>
 </section>
 
 <!-- ═══ КАЛКУЛАТОР — ВИЗАРД ВО 4 ЧЕКОРИ ═══ -->
 <section id="calc" class="calc-dark section-pad no-print">
   <div data-reveal="0">
-    <div class="sec-kick">03 / КАЛКУЛАТОР НА ЦЕНИ</div>
+    <div class="sec-kick">05 / КАЛКУЛАТОР НА ЦЕНИ</div>
     <h2 class="sec-title" style="max-width: 16ch;">Пресметај ја твојата куќа.</h2>
     <p class="sub" style="max-width: 54ch; margin: 16px 0 0; font-size: 15px; line-height: 1.6;">Во четири чекори добиваш ориентациона цена базирана на реални материјали и работна рака — истата методологија како официјалната МДА пресметка.</p>
   </div>
@@ -252,21 +341,145 @@
   </div>
 </section>
 
+<!-- ═══ НАША ИЗРАБОТКА ═══ -->
+<section id="work" class="section-pad no-print" style="scroll-margin-top: calc(var(--notice-h, 0px) + 78px);">
+  <div class="models-head" data-reveal="0">
+    <div>
+      <div class="sec-kick">06 / НАША ИЗРАБОТКА</div>
+      <h2 class="sec-title">Реализирани домови.</h2>
+    </div>
+    <a href="#customplan" class="mono" style="font-size: 13px; color: var(--ink);">Побарај свој проект →</a>
+  </div>
+  <div class="gallery-grid" id="galleryGrid"></div>
+</section>
+
+<!-- ═══ ЕДУКАЦИЈА ═══ -->
+<section id="education" class="section-pad no-print" style="background: var(--dark); color: #fff; scroll-margin-top: calc(var(--notice-h, 0px) + 78px);">
+  <div data-reveal="0" style="max-width: 62ch;">
+    <div class="sec-kick" style="color: var(--accent-soft);">07 / ЕДУКАЦИЈА</div>
+    <h2 class="sec-title">Научи што се монтажни куќи.</h2>
+    <p style="color: #b9b3aa; font-size: clamp(15px,1.2vw,18px); line-height: 1.7; margin: 22px 0 0;">Монтажните куќи се градат надвор од локацијата, во контролирана фабричка средина, а потоа се транспортираат и склопуваат на градилиштето. Тоа значи побрза изградба, доследен квалитет и целосно прилагодување на вашите потреби.</p>
+  </div>
+  <div class="edu-grid">
+    <div class="edu-card" data-reveal="0"><h3>Побрза изградба</h3><p>Деловите се градат надвор од локацијата, па времето за склопување на лице место е значително намалено.</p></div>
+    <div class="edu-card" data-reveal="90"><h3>Исплатливост</h3><p>Помалку труд и материјали и можност за масовно производство на компоненти — поевтино од традиционалната градба.</p></div>
+    <div class="edu-card" data-reveal="180"><h3>Доследност</h3><p>Изградба во контролирана средина обезбедува конзистентен квалитет и изработка на секој модел.</p></div>
+    <div class="edu-card" data-reveal="270"><h3>Енергетска ефикасност</h3><p>Изолација, висококвалитетни прозорци и ефикасни системи за греење и ладење — заштеда на сметките со текот на времето.</p></div>
+  </div>
+</section>
+
+<!-- ═══ FAQ ═══ -->
+<section id="faq" class="section-pad no-print" style="scroll-margin-top: calc(var(--notice-h, 0px) + 78px);">
+  <div data-reveal="0" style="margin-bottom: clamp(24px,3vw,40px);">
+    <div class="sec-kick">08 / FAQ</div>
+    <h2 class="sec-title">Често поставувани прашања.</h2>
+  </div>
+  <div class="faq-list" data-reveal="60" id="faqList">
+    <div class="faq-item">
+      <button class="faq-q">Дали дрвото е безбедно од земјотреси?<span class="faq-ic">+</span></button>
+      <div class="faq-a"><p>Монтажните куќи со дрвена носечка конструкција имаат одлична отпорност на земјотреси. Дрвото е 13 пати полесно од челикот и 8 пати полесно од бетонот, па сеизмичкото оптоварување е значително помало. Во комбинација со метални сврзувачки елементи, конструкцијата се однесува еластично при оптоварување, а правилното закотвување на фундаментот обезбедува висока сигурност.</p></div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q">Колку време се гради еден монтажен објект?<span class="faq-ic">+</span></button>
+      <div class="faq-a"><p>Изработката во нашиот погон трае од 10 до 20 дена во зависност од моделот. Монтажата на локација е од 10 до 30 дена од пристигнувањето. Во монтажата е вклучена целосната изработка до финална фаза — до клуч на рака, целосно спремна за живеење.</p></div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q">Дали има гаранција?<span class="faq-ic">+</span></button>
+      <div class="faq-a"><p>Да — сите наши модели нудат 5-годишна гаранција на конструкцијата. Користиме материјали со сертифициран квалитет, производство во контролирани услови и изолациони премази за заштита и импрегнација, што гарантира долготрајна заштита на вашиот објект.</p></div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q">Зошто MDA куќите се поразлични од другите?<span class="faq-ic">+</span></button>
+      <div class="faq-a"><p>Нудиме современ пристап на заштита на дрвото и високи изолациони својства на ѕидните, подните и кровните површини. Совршена комбинација на дрво и природа, без материјали штетни за секојдневно користење, со природна вентилација и циркулација на воздух.</p></div>
+    </div>
+    <div class="faq-item">
+      <button class="faq-q">Кои се опциите на плаќање?<span class="faq-ic">+</span></button>
+      <div class="faq-a"><p>По претходна консултација со нашите архитекти во канцеларија, избор на внатрешни и надворешни материјали и финализирање на идејниот проект, се договараме за начинот на плаќање што ви одговара.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ КУЌА ПО МОЈ ПЛАН ═══ -->
+<section id="customplan" class="section-pad no-print" style="background: var(--panel); scroll-margin-top: calc(var(--notice-h, 0px) + 78px);">
+  <div class="custom-grid">
+    <div data-reveal="0">
+      <div class="sec-kick">09 / КУЌА ПО МОЈ ПЛАН</div>
+      <h2 class="sec-title">Испрати ја<br>твојата идеја.</h2>
+      <p style="font-size: 15px; line-height: 1.65; color: #40444a; margin: 20px 0 0; max-width: 46ch;">Пополни го формуларот со твоите потреби и скици — ќе имаме доволно информации за да направиме брза пресметка и да ти одговориме на сите прашања за изработка.</p>
+    </div>
+    <form class="custom-form card" data-reveal="120" id="inquiryForm">
+      <div class="card-body" style="display: grid; gap: 16px;">
+        <div class="form-row">
+          <div class="field"><label>Име</label><input type="text" name="firstName" required></div>
+          <div class="field"><label>Презиме</label><input type="text" name="lastName"></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Email</label><input type="email" name="email" required></div>
+          <div class="field"><label>Телефон</label><input type="text" name="phone" required></div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Локација за градба</label><input type="text" name="location" placeholder="Град / населба"></div>
+          <div class="field"><label>Посакувана квадратура</label>
+            <select name="area">
+              <option value="">Избери…</option>
+              <option>до 40 m²</option><option>40–70 m²</option><option>70–100 m²</option>
+              <option>100–150 m²</option><option>150–200 m²</option><option>над 200 m²</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Ги поседувам овие работи</label>
+          <div class="check-grid">
+            <label class="chk"><input type="checkbox" name="has" value="Земјоделско земјиште"><span>Земјоделско земјиште</span></label>
+            <label class="chk"><input type="checkbox" name="has" value="Градежно земјиште"><span>Градежно земјиште</span></label>
+            <label class="chk"><input type="checkbox" name="has" value="Основен план за градба"><span>Основен план за градба</span></label>
+            <label class="chk"><input type="checkbox" name="has" value="Дозвола од општина"><span>Дозвола од општина</span></label>
+            <label class="chk"><input type="checkbox" name="has" value="Платени комуналии"><span>Платени комуналии</span></label>
+            <label class="chk"><input type="checkbox" name="has" value="Бетонски фундамент"><span>Бетонски фундамент</span></label>
+            <label class="chk"><input type="checkbox" name="has" value="Струја на локација"><span>Струја на локација</span></label>
+            <label class="chk"><input type="checkbox" name="has" value="Вода на локација"><span>Вода на локација</span></label>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="field"><label>Буџет (без фундамент и подготвителни работи)</label><input type="text" name="budget" placeholder="пр. 60.000 €"></div>
+          <div class="field"><label>Финансирање</label>
+            <select name="financing">
+              <option value="">Избери…</option>
+              <option>Сам од мои средства</option>
+              <option>Потрошувачки кредит</option>
+              <option>Станбен кредит</option>
+            </select>
+          </div>
+        </div>
+        <div class="field"><label>Опис на потребите / прашања</label><textarea name="message" rows="3" placeholder="Опиши што сакаш да изградиме…"></textarea></div>
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+          <button type="submit" class="btn accent" id="inquirySubmit">Испрати</button>
+          <span id="inquiryNote" class="mono" style="font-size: 12px; color: var(--ink-soft);"></span>
+        </div>
+      </div>
+    </form>
+  </div>
+</section>
+
 <!-- ═══ КОНТАКТ / ФУТЕР ═══ -->
-<footer id="contact" class="section-pad no-print" style="padding-bottom: clamp(36px,4vw,56px); scroll-margin-top: 80px;">
+<footer id="contact" class="section-pad no-print" style="padding-bottom: clamp(36px,4vw,56px); scroll-margin-top: calc(var(--notice-h, 0px) + 78px);">
   <div class="footer-grid" data-reveal="0">
     <div>
-      <div class="sec-kick">04 / КОНТАКТ</div>
+      <div class="sec-kick">10 / КОНТАКТ</div>
       <h2>Замислете го<br>вашиот дом.</h2>
+      <p style="color: var(--ink-soft); font-size: 15px; margin: 18px 0 0;">Посетете нè во нашата канцеларија во Скопје или контактирајте нè директно.</p>
     </div>
     <div class="contact-links">
       <a href="tel:+38971336108" id="phoneFoot"><span>071 336 108</span><span>→</span></a>
-      <a class="soft" href="mailto:info@modulardesignarchitects.com"><span>info@modulardesignarchitects.com</span><span>→</span></a>
+      <a class="soft" href="mailto:mda.skopje@yahoo.com"><span>mda.skopje@yahoo.com</span><span>→</span></a>
       <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 22px; color: var(--ink-soft); font-size: 14px;"><span>ул. Шарски Одред бр.5, Скопје</span></div>
+      <div style="display: flex; justify-content: space-between; align-items: center; padding: 0 22px 6px; color: var(--ink-soft); font-size: 14px;"><span>ул. Козара бр.4/14, Скопје 1000</span></div>
     </div>
   </div>
   <div class="footer-bottom">
-    <span>© 2026 MODULAR DESIGN ARCHITECTS</span>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <img src="assets/mda-logo-256.png" alt="MDA" style="height: 34px; width: auto;">
+      <span>© 2026 MODULAR DESIGN ARCHITECTS</span>
+    </div>
     <span>ПОМАЛКУ КУЌА, ПОВЕЌЕ ДОМ</span>
   </div>
 </footer>

@@ -58,6 +58,7 @@
       b.classList.add('active');
       $('#tab-' + b.dataset.tab).classList.add('active');
       if (b.dataset.tab === 'quotes') renderQuotes();
+      if (b.dataset.tab === 'inquiries') renderInquiries();
     };
   });
 
@@ -311,6 +312,52 @@
         if (!confirm('Избриши понуда?')) return;
         await api('/api/admin/quotes/' + id, 'DELETE');
         renderQuotes();
+      };
+    });
+  }
+
+  // ══ БАРАЊА (Куќа по мој план) ══
+  async function renderInquiries() {
+    const list = await api('/api/admin/inquiries');
+    const body = $('#inquiryTable tbody');
+    if (!list.length) {
+      body.innerHTML = '<tr><td colspan="7" class="muted" style="text-align:center;padding:24px;">Нема пристигнати барања.</td></tr>';
+      return;
+    }
+    body.innerHTML = list.map((q) => {
+      const name = [q.firstName, q.lastName].filter(Boolean).join(' ') || '—';
+      const contact = [q.phone, q.email].filter(Boolean).join(' · ');
+      const detail = [
+        q.has && q.has.length ? 'Поседува: ' + q.has.join(', ') : '',
+        q.financing ? 'Финансирање: ' + q.financing : '',
+        q.message ? 'Порака: ' + q.message : '',
+      ].filter(Boolean).map(esc).join('<br>');
+      return `<tr data-id="${q.id}">
+          <td class="mono muted" style="white-space:nowrap;">${new Date(q.createdAt).toLocaleString('mk-MK')}</td>
+          <td>${esc(name)}</td>
+          <td style="font-size:12px;">${esc(contact)}</td>
+          <td>${esc(q.location || '—')}</td>
+          <td>${esc(q.area || '—')}</td>
+          <td>${esc(q.budget || '—')}</td>
+          <td style="white-space:nowrap;">
+            ${detail ? '<button class="icon-btn view" title="Детали">▾</button>' : ''}
+            <button class="icon-btn del" title="Избриши">🗑</button>
+          </td>
+        </tr>${detail ? `<tr class="inq-detail" data-for="${q.id}" style="display:none;"><td colspan="7" style="background:var(--panel);font-size:12.5px;line-height:1.6;color:var(--ink-soft);">${detail}</td></tr>` : ''}`;
+    }).join('');
+    body.querySelectorAll('.view').forEach((b) => {
+      b.onclick = () => {
+        const id = b.closest('tr').dataset.id;
+        const d = body.querySelector('.inq-detail[data-for="' + id + '"]');
+        if (d) d.style.display = d.style.display === 'none' ? '' : 'none';
+      };
+    });
+    body.querySelectorAll('.del').forEach((b) => {
+      b.onclick = async () => {
+        const id = b.closest('tr').dataset.id;
+        if (!confirm('Избриши барање?')) return;
+        await api('/api/admin/inquiries/' + id, 'DELETE');
+        renderInquiries();
       };
     });
   }

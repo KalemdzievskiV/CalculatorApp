@@ -150,6 +150,27 @@ const server = http.createServer(async (req, res) => {
       return q ? json(res, 200, q) : json(res, 404, { error: 'not found' });
     }
 
+    // Барања од формуларот „Куќа по мој план" — јавно зачувување
+    if (p === '/api/inquiry' && req.method === 'POST') {
+      const body = await readBody(req);
+      const s = (v, n) => String(v == null ? '' : v).slice(0, n);
+      const inquiry = {
+        id: crypto.randomBytes(8).toString('hex'),
+        createdAt: new Date().toISOString(),
+        firstName: s(body.firstName, 80), lastName: s(body.lastName, 80),
+        email: s(body.email, 120), phone: s(body.phone, 60),
+        location: s(body.location, 160), area: s(body.area, 60),
+        has: Array.isArray(body.has) ? body.has.map((x) => s(x, 80)).slice(0, 20) : [],
+        budget: s(body.budget, 60), financing: s(body.financing, 60),
+        message: s(body.message, 3000),
+      };
+      if (!inquiry.email && !inquiry.phone) return json(res, 400, { error: 'Потребен е email или телефон' });
+      db.inquiries = db.inquiries || [];
+      db.inquiries.unshift(inquiry);
+      saveDb();
+      return json(res, 200, { id: inquiry.id });
+    }
+
     if (p.startsWith('/api/admin/')) {
       if (!isAuthed(req)) return json(res, 401, { error: 'Најавете се' });
       const what = p.slice('/api/admin/'.length);
@@ -158,6 +179,14 @@ const server = http.createServer(async (req, res) => {
       const delQuote = what.match(/^quotes\/([a-f0-9]+)$/);
       if (delQuote && req.method === 'DELETE') {
         db.quotes = (db.quotes || []).filter((q) => q.id !== delQuote[1]);
+        saveDb();
+        return json(res, 200, { ok: true });
+      }
+
+      if (what === 'inquiries' && req.method === 'GET') return json(res, 200, db.inquiries || []);
+      const delInq = what.match(/^inquiries\/([a-f0-9]+)$/);
+      if (delInq && req.method === 'DELETE') {
+        db.inquiries = (db.inquiries || []).filter((q) => q.id !== delInq[1]);
         saveDb();
         return json(res, 200, { ok: true });
       }

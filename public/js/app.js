@@ -448,19 +448,31 @@
   }
 
   // ── Reveal анимации и бројачи ──
+  function reveal(el) {
+    if (el.classList.contains('revealed')) return;
+    el.style.transitionDelay = ((+el.dataset.reveal || 0) / 1000) + 's';
+    el.classList.add('revealed');
+    el.querySelectorAll('[data-count]').forEach(countUp);
+    if (el.matches('[data-count]')) countUp(el);
+  }
   function initReveal() {
+    if (!('IntersectionObserver' in window)) {
+      document.querySelectorAll('[data-reveal]').forEach(reveal);
+      return;
+    }
     const io = new IntersectionObserver((ents) => {
-      ents.forEach((en) => {
-        if (!en.isIntersecting) return;
-        const el = en.target;
-        el.style.transitionDelay = ((+el.dataset.reveal || 0) / 1000) + 's';
-        el.classList.add('revealed');
-        el.querySelectorAll('[data-count]').forEach(countUp);
-        if (el.matches('[data-count]')) countUp(el);
-        io.unobserve(el);
-      });
+      ents.forEach((en) => { if (en.isIntersecting) { reveal(en.target); io.unobserve(en.target); } });
     }, { threshold: 0.12 });
-    document.querySelectorAll('[data-reveal]').forEach((el) => io.observe(el));
+    const all = document.querySelectorAll('[data-reveal]');
+    all.forEach((el) => io.observe(el));
+    // Безбедносна мрежа: содржината над преломот се прикажува веднаш дури и ако
+    // почетниот повик на набљудувачот доцни (никогаш не смее херо-то да остане празно).
+    requestAnimationFrame(() => {
+      all.forEach((el) => {
+        const r = el.getBoundingClientRect();
+        if (r.top < (window.innerHeight || 800) * 0.95) { reveal(el); io.unobserve(el); }
+      });
+    });
   }
   function countUp(el) {
     if (el.__counted) return;
@@ -505,5 +517,102 @@
       syncSliders();
       recalc();
     } catch (e) { /* игнорирај */ }
+  }
+})();
+
+/* ── Интеракции на лендинг страницата (независни од калкулаторот) ── */
+(function () {
+  const $ = (s) => document.querySelector(s);
+  const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+  const nav = $('#siteNav');
+  const notice = $('#noticeBar');
+
+  // Висина на лентата за известување → CSS променлива (за позицијата на навигацијата и херо-то)
+  function syncNoticeHeight() {
+    const h = notice && !notice.classList.contains('hidden') ? notice.offsetHeight : 0;
+    document.documentElement.style.setProperty('--notice-h', h + 'px');
+    document.body.classList.toggle('notice-closed', h === 0);
+  }
+
+  // Известување — затворање (се памети во сесијата)
+  if (notice && sessionStorage.getItem('mdaNoticeClosed')) notice.classList.add('hidden');
+  const nx = $('#noticeClose');
+  if (nx) nx.onclick = () => { notice.classList.add('hidden'); sessionStorage.setItem('mdaNoticeClosed', '1'); syncNoticeHeight(); };
+  syncNoticeHeight();
+  window.addEventListener('resize', syncNoticeHeight);
+
+  // Навигацијата станува цврста штом ќе се скролне од херо-то
+  function onScroll() {
+    if (nav) nav.classList.toggle('scrolled', window.scrollY > 40);
+  }
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+
+  // Мобилно мени
+  const burger = $('#navBurger'), links = $('#navLinks');
+  if (burger && links) {
+    burger.onclick = () => links.classList.toggle('open');
+    links.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => links.classList.remove('open')));
+  }
+
+  // FAQ акордеон
+  document.querySelectorAll('.faq-item').forEach((item) => {
+    const q = item.querySelector('.faq-q');
+    const a = item.querySelector('.faq-a');
+    q.onclick = () => {
+      const open = item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach((o) => { o.classList.remove('open'); o.querySelector('.faq-a').style.maxHeight = null; });
+      if (!open) { item.classList.add('open'); a.style.maxHeight = a.scrollHeight + 'px'; }
+    };
+  });
+
+  // Галерија — плејсхолдери за фотографии од реализирани објекти
+  const gallery = $('#galleryGrid');
+  if (gallery) {
+    const items = [
+      { cap: '// вила со тераса', wide: true },
+      { cap: '// ентериер · дневна' },
+      { cap: '// монтажа на локација' },
+      { cap: '// фасада абриб' },
+      { cap: '// кров и олуци' },
+      { cap: '// tiny one модел', wide: true },
+    ];
+    gallery.innerHTML = items.map((it) =>
+      `<div class="gallery-item${it.wide ? ' wide' : ''}"><div class="img-ph">${esc(it.cap)}</div><span class="cap">${esc(it.cap.replace('// ', ''))}</span></div>`
+    ).join('');
+  }
+
+  // Форма „Куќа по мој план"
+  const form = $('#inquiryForm');
+  if (form) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const note = $('#inquiryNote');
+      const btn = $('#inquirySubmit');
+      const fd = new FormData(form);
+      const payload = {
+        firstName: fd.get('firstName') || '', lastName: fd.get('lastName') || '',
+        email: fd.get('email') || '', phone: fd.get('phone') || '',
+        location: fd.get('location') || '', area: fd.get('area') || '',
+        has: fd.getAll('has'), budget: fd.get('budget') || '',
+        financing: fd.get('financing') || '', message: fd.get('message') || '',
+      };
+      btn.disabled = true;
+      note.style.color = 'var(--ink-soft)';
+      note.textContent = 'Се испраќа…';
+      try {
+        const r = await fetch('/api/inquiry', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        if (!r.ok) throw new Error();
+        form.reset();
+        note.style.color = '#2e7d32';
+        note.textContent = 'Фала на вашето прашање — ќе ве информираме наскоро.';
+      } catch (err) {
+        note.style.color = 'var(--accent)';
+        note.textContent = 'Грешка при испраќање. Обидете се повторно или јавете се на 071 336 108.';
+      } finally {
+        btn.disabled = false;
+      }
+    });
   }
 })();
