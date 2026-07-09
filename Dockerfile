@@ -6,9 +6,10 @@ COPY . .
 
 ENV NODE_ENV=production
 ENV PORT=3000
-# Базата се чува на монтиран диск за да преживее рестарт/редеплој
+# Базата се чува на монтиран диск за да преживее рестарт/редеплој.
+# На Railway: прикачи Volume со mount path „/data" (не се користи Docker VOLUME —
+# Railway Metal builder не го поддржува).
 ENV MDA_DB_FILE=/data/db.json
-VOLUME ["/data"]
 
 EXPOSE 3000
 # Health-check го користи PORT (Railway инјектира свој PORT при рестарт)
