@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Модели на куќи | Modular Design Architects</title>
+<meta name="description" content="Готови модели на монтажни куќи од Modular Design Architects — површини, спецификации и промо цени.">
+<link rel="icon" href="assets/mda-logo-256.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ═══ НАВИГАЦИЈА ═══ -->
+<nav class="nav no-print" id="siteNav">
+  <a class="brand" href="index.html">
+    <img class="nav-logo" src="assets/mda-logo-256.png" alt="Modular Design Architects">
+    <span>MODULAR DESIGN</span>
+  </a>
+  <div class="links" id="navLinks">
+    <a href="index.html#about">ЗА НАС</a>
+    <a href="index.html#services">УСЛУГИ</a>
+    <a href="models.html" class="active-link">МОДЕЛИ</a>
+    <a href="index.html#calc">КАЛКУЛАТОР</a>
+    <a href="index.html#education">ЕДУКАЦИЈА</a>
+    <a href="index.html#faq">FAQ</a>
+    <a href="index.html#contact">КОНТАКТ</a>
+  </div>
+  <div class="nav-right">
+    <div class="lang-switch">
+      <a class="active" href="https://www.modulardesignarchitects.com/">МК</a>
+      <a href="https://en.modulardesignarchitects.com/">EN</a>
+      <a href="https://hr.modulardesignarchitects.com/">HR</a>
+    </div>
+    <a class="cta" id="phoneCta" href="tel:+38971336108">071 336 108</a>
+    <button class="nav-burger" id="navBurger" aria-label="Мени">☰</button>
+  </div>
+</nav>
+
+<!-- ═══ ЗАГЛАВИЕ ═══ -->
+<header class="models-hero no-print">
+  <div class="sec-kick">МОДЕЛИ НА КУЌИ · 2023–2025</div>
+  <h1 class="models-h1">Готови модели.</h1>
+  <p class="models-sub">Изберете од нашите изработени модели монтажни куќи. Цените се промо, по m², во три изведби — <strong>камена волна</strong>, <strong>СИП панел</strong> и <strong>сива фаза</strong>. Кликнете на модел за детали и галерија.</p>
+  <div class="models-toolbar">
+    <div class="filters" id="typeFilters"></div>
+    <div class="sortwrap">
+      <label class="mono" for="sortSel">Подреди:</label>
+      <select id="sortSel">
+        <option value="area-asc">Површина ↑</option>
+        <option value="area-desc">Површина ↓</option>
+        <option value="name">Име (А–Ш)</option>
+        <option value="year-desc">Најнови</option>
+      </select>
+    </div>
+  </div>
+  <div class="models-count mono" id="modelsCount"></div>
+</header>
+
+<!-- ═══ ГРИД СО МОДЕЛИ ═══ -->
+<main class="models-page-grid no-print" id="modelsPageGrid"></main>
+
+<!-- ═══ CTA ═══ -->
+<section class="models-cta no-print">
+  <div>
+    <h2 class="sec-title" style="color:#fff;">Не гледате го вашиот модел?</h2>
+    <p style="color:#b9b3aa; margin:14px 0 0; max-width:52ch;">Направете сопствена пресметка во калкулаторот или испратете ни ја вашата идеја — градиме и по ваш план.</p>
+  </div>
+  <div style="display:flex; gap:12px; flex-wrap:wrap;">
+    <a class="btn-hero solid" href="index.html#calc">ПРЕСМЕТАЈ ЦЕНА →</a>
+    <a class="btn-hero line" style="border-color:#fff; color:#fff; background:transparent;" href="index.html#customplan">КУЌА ПО МОЈ ПЛАН</a>
+  </div>
+</section>
+
+<!-- ═══ ФУТЕР ═══ -->
+<footer class="section-pad no-print" style="padding-bottom: clamp(36px,4vw,56px);">
+  <div class="footer-bottom" style="border-top:none;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <img src="assets/mda-logo-256.png" alt="MDA" style="height:34px; width:auto;">
+      <span>© 2026 MODULAR DESIGN ARCHITECTS</span>
+    </div>
+    <span>ПОМАЛКУ КУЌА, ПОВЕЌЕ ДОМ</span>
+  </div>
+</footer>
+
+<!-- ═══ МОДАЛ ЗА ДЕТАЛИ ═══ -->
+<div class="model-modal-back" id="modelModal">
+  <div class="model-modal">
+    <button class="model-modal-x" id="modelModalClose" aria-label="Затвори">×</button>
+    <div class="model-modal-body" id="modelModalBody"></div>
+  </div>
+</div>
+
+<script src="js/models-data.js"></script>
+<script src="js/models.js"></script>
+</body>
+</html>

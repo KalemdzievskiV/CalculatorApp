@@ -60,13 +60,6 @@
 
   const STEP_LABELS = ['Површина и систем', 'Клучни ставки', 'Инсталации и финиш', 'Резиме'];
 
-  const MODELS = [
-    { id: 'tiny', name: 'TINY ONE', area: 30, terrace: 8, wc: 1, doors: 2, tag: 'ВИКЕНДИЦА', desc: 'Компактен дом за пар или соло живот.' },
-    { id: 'bungalow', name: 'BUNGALOW', area: 55, terrace: 10, wc: 1, doors: 4, tag: 'СЕМЕЕН СТАРТ', desc: 'Отворен простор со две спални соби.' },
-    { id: 'family', name: 'FAMILY', area: 90, terrace: 12, wc: 2, doors: 6, tag: 'НАЈПОПУЛАРЕН', desc: 'Простран дом за целото семејство.' },
-    { id: 'villa', name: 'VILLA', area: 140, terrace: 20, wc: 3, doors: 8, tag: 'ПРЕМИУМ', desc: 'Луксузен модуларен дом со тераса.' },
-  ];
-
   // ── Форматирање ──
   const fmtEur = (v) => '€' + new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(Math.round(v));
   const fmtEur2 = (v) => new Intl.NumberFormat('mk-MK', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v) + ' €';
@@ -328,39 +321,28 @@
   $('#resetWin').onclick = () => { state.windows = null; renderWinNote(); renderWinTable(); recalc(); };
 
   // ── Модели ──
-  function modelPrice(mo) {
-    const s = Object.assign({}, state, {
-      house: mo.area, terrace: mo.terrace, wc: mo.wc, doors: mo.doors,
-      sys: 'kamena', roof: 'lim', fac: 'abrib', interior: 'gypsum', ceil: true,
-      elec: 'none', floor: 'laminate', windows: null, overrides: {}, discountEur: 0,
-    });
-    return MDAEngine.compute(cfg, { inputs: buildInputs(s), windows: autoWindows(s) }).totalEur;
-  }
+  // Преглед на реални модели (од Wix извозот) — води кон целосната страница models.html
   function renderModels() {
-    $('#modelsGrid').innerHTML = MODELS.map((mo, i) => `
-      <div class="model-card" data-reveal="${i * 90}" data-id="${mo.id}">
-        <div class="photo"><div class="img-ph">// ${mo.name.toLowerCase()}</div><span class="m-tag">${esc(mo.tag)}</span></div>
-        <div class="body">
-          <div style="display:flex;justify-content:space-between;align-items:baseline;">
-            <h3>${esc(mo.name)}</h3><span class="area">${mo.area} m²</span>
-          </div>
-          <p class="desc">${esc(mo.desc)}</p>
-          <div class="price-row"><span style="font-size:11px;color:var(--ink-soft);">од</span>
-            <span class="from-price">${fmtEur(modelPrice(mo))}</span></div>
+    const host = $('#modelsGrid');
+    const all = window.MDA_MODELS || [];
+    if (!all.length) { host.innerHTML = ''; return; }
+    // разновиден преглед: 8 модели рамномерно по површина
+    const sorted = [...all].sort((a, b) => a.area - b.area);
+    const step = Math.max(1, Math.ceil(sorted.length / 8));
+    const pick = sorted.filter((_, i) => i % step === 0).slice(0, 8);
+    host.innerHTML = pick.map((m) => `
+      <a class="mp-card" href="models.html?model=${encodeURIComponent(m.name)}" style="text-decoration:none;color:inherit;">
+        <div class="mp-photo">
+          ${m.image ? `<img loading="lazy" src="${esc(m.image)}" alt="${esc(m.name)}" onerror="this.style.display='none';this.parentNode.classList.add('noimg')">` : ''}
+          ${m.promo ? '<span class="mp-promo">PROMO</span>' : ''}
+          <span class="mp-area">${esc(m.areaLabel || m.area + ' m²')}</span>
         </div>
-      </div>`).join('');
-    $('#modelsGrid').querySelectorAll('.model-card').forEach((card) => {
-      card.onclick = () => {
-        const mo = MODELS.find((x) => x.id === card.dataset.id);
-        Object.assign(state, { house: mo.area, terrace: mo.terrace, wc: mo.wc, doors: mo.doors, windows: null, overrides: {} });
-        syncSliders();
-        renderAdv();
-        renderWinNote();
-        setStep(1);
-        recalc();
-        document.getElementById('calc').scrollIntoView({ behavior: 'smooth' });
-      };
-    });
+        <div class="mp-body">
+          <h3>${esc(m.name)}</h3>
+          <div class="mp-pricerow"><span class="mp-from">од</span>
+            <span class="mp-price">${esc(m.priceGray || m.priceSip || m.priceStone || '—')}</span></div>
+        </div>
+      </a>`).join('');
   }
 
   // ── Попуст / клиент ──
