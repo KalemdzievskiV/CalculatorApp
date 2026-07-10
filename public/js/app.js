@@ -551,21 +551,6 @@
     };
   });
 
-  // Галерија — плејсхолдери за фотографии од реализирани објекти
-  const gallery = $('#galleryGrid');
-  if (gallery) {
-    const items = [
-      { cap: '// вила со тераса', wide: true },
-      { cap: '// ентериер · дневна' },
-      { cap: '// монтажа на локација' },
-      { cap: '// фасада абриб' },
-      { cap: '// кров и олуци' },
-      { cap: '// tiny one модел', wide: true },
-    ];
-    gallery.innerHTML = items.map((it) =>
-      `<div class="gallery-item${it.wide ? ' wide' : ''}"><div class="img-ph">${esc(it.cap)}</div><span class="cap">${esc(it.cap.replace('// ', ''))}</span></div>`
-    ).join('');
-  }
 
   // Форма „Куќа по мој план"
   const form = $('#inquiryForm');
