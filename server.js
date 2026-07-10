@@ -89,7 +89,9 @@ function readBody(req) {
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.json': 'application/json',
-  '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.ico': 'image/x-icon',
+  '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+  '.avif': 'image/avif', '.webp': 'image/webp',
+  '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.woff2': 'font/woff2',
 };
 
 // Јавната конфигурација — без админ лозинка
@@ -192,6 +194,12 @@ const server = http.createServer(async (req, res) => {
         db.inquiries = (db.inquiries || []).filter((q) => q.id !== delInq[1]);
         saveDb();
         return json(res, 200, { ok: true });
+      }
+
+      // Шаблони за ПОНУДА (клуч на рака / сива фаза) — само за админ
+      if (what === 'offer' && req.method === 'GET') {
+        delete require.cache[require.resolve('./data/offer.js')];
+        return json(res, 200, require('./data/offer.js'));
       }
 
       // Извоз на целата база (за резервна копија / пренос на друг сервер) — без лозинката

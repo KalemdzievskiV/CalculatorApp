@@ -66,6 +66,7 @@
       <button data-tab="categories">КАТЕГОРИИ</button>
       <button data-tab="inputs">ПАРАМЕТРИ</button>
       <button data-tab="windows">ДОГРАМА</button>
+      <button data-tab="calc">КАЛКУЛАТОР</button>
       <button data-tab="quotes">ПОНУДИ</button>
       <button data-tab="inquiries">БАРАЊА</button>
       <button data-tab="settings">ПОДЕСУВАЊА</button>
@@ -127,6 +128,80 @@
         <thead><tr><th>#</th><th>Опис</th><th class="num">Количина</th><th class="num">Цена ЕУР</th><th></th></tr></thead>
         <tbody></tbody>
       </table></div>
+    </div>
+
+    <!-- КАЛКУЛАТОР (полна верзија за интерна употреба) -->
+    <div class="tab-panel" id="tab-calc">
+      <div class="card" style="margin-bottom: 16px;">
+        <div class="card-body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; align-items: end;">
+          <div class="field"><label>Клиент</label><input type="text" id="cClient" placeholder="Име и презиме"></div>
+          <div class="field"><label>Датум</label><input type="text" id="cDate"></div>
+          <div class="field"><label>Попуст (ЕУР)</label><input type="number" step="any" id="cDiscount" value="0"></div>
+          <div class="field"><label>Покриени тераси (m²)</label><input type="number" step="any" id="cCovered" value="0"></div>
+          <div class="field"><label>Откриени тераси (m²)</label><input type="number" step="any" id="cOpen"></div>
+          <div class="field"><label>Катна висина надв. (m)</label><input type="number" step="any" id="cOuterH" value="4.6"></div>
+        </div>
+      </div>
+
+      <div class="calc-admin-grid">
+        <div>
+          <div class="card">
+            <div class="card-head"><h3>Влезни параметри</h3><button class="btn ghost small" id="cReset">↺ Стандардни</button></div>
+            <div class="card-body" id="cInputs" style="display: grid; gap: 18px;"></div>
+          </div>
+
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-head"><h3>Прозори и врати (дограма)</h3><button class="btn ghost small" id="cAddWin">+ Ред</button></div>
+            <div class="card-body" style="padding: 8px 12px;">
+              <table class="data" id="cWinTable">
+                <thead><tr><th>#</th><th>Опис</th><th class="num">Кол.</th><th class="num">Цена ЕУР</th><th></th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="card calc-sum">
+            <div class="card-head"><h3>Резултат</h3></div>
+            <div class="card-body">
+              <div class="cs-row big"><span>ВКУПНО (со ДДВ)</span><b id="cTotalEur">—</b></div>
+              <div class="cs-row"><span>Вкупно во МКД</span><b id="cTotalMkd">—</b></div>
+              <div class="cs-row"><span>ДДВ (издвоен)</span><b id="cTax">—</b></div>
+              <div class="cs-row"><span>Цена по m²</span><b id="cPerM2">—</b></div>
+              <div class="cs-row"><span>Вкупна површина</span><b id="cArea">—</b></div>
+              <div class="cs-row grey"><span>СИВА ФАЗА</span><b id="cGrey">—</b></div>
+              <div class="cs-row"><span>Сива фаза по m²</span><b id="cGreyM2">—</b></div>
+              <div class="cs-row final"><span>Цена со попуст</span><b id="cFinal">—</b></div>
+              <div class="cs-row"><span>Цена/m² со симсови</span><b id="cPerM2Sims">—</b></div>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-head"><h3>Генерирај понуда</h3></div>
+            <div class="card-body" style="display: grid; gap: 10px;">
+              <button class="btn accent" id="cOfferTurnkey">🖨 ПОНУДА — КЛУЧ НА РАКА</button>
+              <button class="btn ghost" id="cOfferGrey">🖨 ПОНУДА — СИВА ФАЗА</button>
+              <button class="btn ghost" id="cSaveQuote">Зачувај понуда</button>
+              <span id="cNote" class="hint"></span>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-head"><h3>По категории</h3></div>
+            <div class="card-body" style="padding: 6px 16px;" id="cRecap"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px; overflow-x: auto;">
+        <div class="card-head"><h3>Детална спецификација по материјали</h3><span class="hint" id="cRowCount"></span></div>
+        <table class="data" id="cSpecTable">
+          <thead><tr><th>Код</th><th>Материјал</th><th>Ед.м</th><th class="num">Кол.</th><th class="num">Ед. цена МКД</th><th class="num">Вкупно МКД</th><th class="num">ЕУР</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <div id="cErrors" style="margin-top: 12px;"></div>
     </div>
 
     <!-- ПОНУДИ -->
@@ -221,6 +296,9 @@
 </div>
 
 <div class="save-flash" id="flash">Зачувано ✓</div>
+
+<!-- Контејнер за печатење на ПОНУДА -->
+<div id="offerPrint"></div>
 
 <script src="js/engine.js"></script>
 <script src="js/admin.js"></script>

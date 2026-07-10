@@ -176,24 +176,6 @@
     $('#recapLines').innerHTML = html;
     $('#recapGrey').textContent = fmtEur(last.greyEur);
     $('#recapTotal').textContent = fmtEur(last.finalEur);
-    renderDetailTable();
-  }
-
-  function renderDetailTable() {
-    const body = $('#detailTable tbody');
-    let html = '';
-    for (const c of cfg.categories) {
-      const rows = last.rows.filter((r) => r.cat === c.id && r.totalMkd > 0.005);
-      if (!rows.length) continue;
-      const catEur = rows.reduce((s, r) => s + r.eur, 0);
-      html += `<tr class="cat-row"><td colspan="6">${esc(c.name)}</td><td class="num">${fmtEur(catEur)}</td></tr>`;
-      for (const r of rows) {
-        html += `<tr><td class="mono muted">${r.code || '—'}</td><td>${esc(r.name)}</td><td class="muted">${esc(r.unit)}</td>
-          <td class="num">${fmtQty(r.qty)}</td><td class="num">${fmtQty(r.price)}</td>
-          <td class="num">${fmtMkd(r.totalMkd)}</td><td class="num">${fmtEur2(r.eur)}</td></tr>`;
-      }
-    }
-    body.innerHTML = html;
   }
 
   // ── Чекори ──
@@ -225,11 +207,6 @@
       b.onclick = () => { state[key] = b.dataset.id; renderOpts(hostId, group, key); recalc(); };
     });
   }
-  function renderCeil() {
-    $('#ceilOpt').innerHTML = `<button class="opt-btn ${state.ceil ? 'active' : ''}" id="ceilBtn">
-      <span class="t">${state.ceil ? 'Вклучен' : 'Исклучен'}</span><span class="s">гипс плафон низ целата куќа</span></button>`;
-    $('#ceilBtn').onclick = () => { state.ceil = !state.ceil; renderCeil(); recalc(); };
-  }
   function renderAllOpts() {
     renderOpts('sysOpts', 'sys', 'sys');
     renderOpts('roofOpts', 'roof', 'roof');
@@ -237,7 +214,6 @@
     renderOpts('intOpts', 'interior', 'interior');
     renderOpts('elecOpts', 'elec', 'elec');
     renderOpts('floorOpts', 'floor', 'floor');
-    renderCeil();
   }
 
   // ── Лизгачи и степери ──
@@ -249,76 +225,17 @@
     $('#wcVal').textContent = state.wc;
     $('#doorVal').textContent = state.doors;
   }
-  $('#houseRange').oninput = (e) => { state.house = +e.target.value; $('#houseVal').textContent = state.house; renderAdv(); renderWinNote(); recalc(); };
+  $('#houseRange').oninput = (e) => { state.house = +e.target.value; $('#houseVal').textContent = state.house; recalc(); };
   $('#terraceRange').oninput = (e) => { state.terrace = +e.target.value; $('#terraceVal').textContent = state.terrace; recalc(); };
   const bump = (key, d, min, max, valId) => {
     state[key] = Math.max(min, Math.min(max, state[key] + d));
     $(valId).textContent = state[key];
-    if (key === 'wc') renderAdv();
     recalc();
   };
   $('#wcInc').onclick = () => bump('wc', 1, 0, 8, '#wcVal');
   $('#wcDec').onclick = () => bump('wc', -1, 0, 8, '#wcVal');
   $('#doorInc').onclick = () => bump('doors', 1, 0, 16, '#doorVal');
   $('#doorDec').onclick = () => bump('doors', -1, 0, 16, '#doorVal');
-
-  // ── Прецизни мерки (напредно) ──
-  function renderAdv() {
-    const d = derive(state.house, state.wc);
-    $('#advGrid').innerHTML = ADV_FIELDS.map((f) => {
-      const over = state.overrides[f.key] != null;
-      return `<div><label>${esc(f.label)}${over ? ' ·<span style="color:var(--accent-soft);"> рачно</span>' : ''}</label>
-        <input type="number" step="any" data-key="${f.key}" class="${over ? 'overridden' : ''}" value="${over ? state.overrides[f.key] : d[f.key]}"></div>`;
-    }).join('') + `<div style="align-self:end;"><button class="btn ghost small" id="advReset" style="border-color:#4a453e;color:#fff;">↺ Автоматски</button></div>`;
-    $('#advGrid').querySelectorAll('input').forEach((inp) => {
-      inp.onchange = (e) => {
-        state.overrides[inp.dataset.key] = parseFloat(e.target.value) || 0;
-        renderAdv();
-        recalc();
-      };
-    });
-    $('#advReset').onclick = () => { state.overrides = {}; renderAdv(); recalc(); };
-  }
-
-  // ── Дограма ──
-  function renderWinNote() {
-    const k = state.house / REF.AREA;
-    $('#winFactorNote').textContent = state.windows ? 'рачно уредена листа' : 'фактор × ' + k.toFixed(2);
-  }
-  $('#editWinBtn').onclick = () => {
-    const ed = $('#winEditor');
-    const open = ed.style.display === 'none';
-    ed.style.display = open ? '' : 'none';
-    $('#editWinBtn').textContent = open ? 'Затвори листа ▴' : 'Уреди листа ▾';
-    if (open) renderWinTable();
-  };
-  function renderWinTable() {
-    if (!state.windows) state.windows = autoWindows(state);
-    renderWinNote();
-    const body = $('#winTable tbody');
-    body.innerHTML = '';
-    state.windows.forEach((w, i) => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `<td class="mono muted">${i + 1}</td>
-        <td><input type="text" value="${esc(w.name)}"></td>
-        <td class="num"><input type="number" min="0" step="any" style="width:70px;text-align:right;" value="${w.qty}"></td>
-        <td class="num"><input type="number" min="0" step="any" style="width:84px;text-align:right;" value="${w.priceEur}"></td>
-        <td><button class="x-close">×</button></td>`;
-      const [nameI, qtyI, priceI] = tr.querySelectorAll('input');
-      nameI.oninput = (e) => { w.name = e.target.value; };
-      qtyI.oninput = (e) => { w.qty = parseFloat(e.target.value) || 0; recalc(); };
-      priceI.oninput = (e) => { w.priceEur = parseFloat(e.target.value) || 0; recalc(); };
-      tr.querySelector('.x-close').onclick = () => { state.windows.splice(i, 1); renderWinTable(); recalc(); };
-      body.appendChild(tr);
-    });
-  }
-  $('#addWin').onclick = () => {
-    if (!state.windows) state.windows = autoWindows(state);
-    state.windows.push({ name: '', qty: 1, priceEur: 0 });
-    renderWinTable();
-    recalc();
-  };
-  $('#resetWin').onclick = () => { state.windows = null; renderWinNote(); renderWinTable(); recalc(); };
 
   // ── Модели ──
   // Преглед на реални модели (од Wix извозот) — води кон целосната страница models.html
@@ -482,8 +399,6 @@
   // ── Стартување ──
   renderModels();
   renderAllOpts();
-  renderAdv();
-  renderWinNote();
   syncSliders();
   setStep(1);
   recalc();
@@ -494,8 +409,6 @@
     try {
       await loadQuote(quoteId);
       renderAllOpts();
-      renderAdv();
-      renderWinNote();
       syncSliders();
       recalc();
     } catch (e) { /* игнорирај */ }

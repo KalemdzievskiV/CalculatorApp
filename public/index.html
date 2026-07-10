@@ -53,7 +53,12 @@
 
 <!-- ═══ ХЕРО (100vh, навигацијата се прелева над него) ═══ -->
 <header id="home" class="hero-land no-print">
-  <div class="hero-bg"><div class="img-ph">// главна фотографија — екстериер на модуларна куќа</div></div>
+  <div class="hero-bg">
+    <picture>
+      <source srcset="assets/hero-baner.avif" type="image/avif">
+      <img src="assets/hero-baner.jpg" alt="" fetchpriority="high">
+    </picture>
+  </div>
   <div class="hero-inner" data-reveal="80">
     <div class="hero-meta">
       <span>— MODULAR HOUSES —</span><span class="d">/</span>
@@ -212,10 +217,6 @@
           <div class="wiz-label">КОНСТРУКТИВЕН СИСТЕМ</div>
           <div class="opt-grid c2" id="sysOpts"></div>
         </div>
-        <details class="adv-details">
-          <summary>ПРЕЦИЗНИ МЕРКИ — автоматски од квадратурата, уредливи ▾</summary>
-          <div class="adv-grid" id="advGrid"></div>
-        </details>
       </div>
 
       <!-- ЧЕКОР 2: Клучни ставки -->
@@ -231,10 +232,6 @@
         <div class="wiz-block">
           <div class="wiz-label">ВНАТРЕШНО УРЕДУВАЊЕ</div>
           <div class="opt-grid c2" id="intOpts"></div>
-        </div>
-        <div class="wiz-block">
-          <div class="wiz-label">СПУШТЕН ПЛАФОН</div>
-          <div class="opt-grid" style="grid-template-columns: minmax(220px, 320px);" id="ceilOpt"></div>
         </div>
       </div>
 
@@ -262,21 +259,6 @@
           <div class="wiz-label">ПОДОВИ</div>
           <div class="opt-grid c3" id="floorOpts"></div>
         </div>
-        <div class="wiz-block">
-          <div class="wiz-label">ПРОЗОРИ И ВРАТИ (ДОГРАМА)</div>
-          <p style="font-size: 13px; color: #b9b3aa; margin: 0 0 10px; line-height: 1.5;">Стандарден сет прозори и врати, автоматски скалиран според квадратурата — <span id="winFactorNote" class="mono" style="color: var(--accent-soft);"></span></p>
-          <button class="btn ghost small" id="editWinBtn" style="border-color: #4a453e; color: #fff;">Уреди листа ▾</button>
-          <div class="win-editor" id="winEditor" style="display: none;">
-            <table class="data" id="winTable">
-              <thead><tr><th>#</th><th>Опис</th><th class="num">Кол.</th><th class="num">Цена ЕУР</th><th></th></tr></thead>
-              <tbody></tbody>
-            </table>
-            <div style="padding: 8px 4px 2px; display: flex; gap: 10px;">
-              <button class="btn ghost small" id="addWin">+ Додади ред</button>
-              <button class="btn ghost small" id="resetWin">↺ Врати автоматски сет</button>
-            </div>
-          </div>
-        </div>
       </div>
 
       <!-- ЧЕКОР 4: Резиме -->
@@ -302,15 +284,6 @@
           <button class="btn ghost" id="saveBtn" style="border-color: #4a453e; color: #fff;">Зачувај понуда</button>
           <span id="saveNote" class="mono" style="font-size: 11.5px; color: #b9b3aa; align-self: center;"></span>
         </div>
-        <details class="detail-details">
-          <summary>ДЕТАЛНА СПЕЦИФИКАЦИЈА ПО МАТЕРИЈАЛИ ▾</summary>
-          <div class="detail-wrap">
-            <table class="data" id="detailTable">
-              <thead><tr><th>Код</th><th>Опис</th><th>Ед.м</th><th class="num">Кол.</th><th class="num">Ед. цена МКД</th><th class="num">Вкупно МКД</th><th class="num">ЕУР</th></tr></thead>
-              <tbody></tbody>
-            </table>
-          </div>
-        </details>
         <p style="font-size: 12px; color: var(--muted); line-height: 1.55; margin: 18px 0 0;">*Ориентациона цена со ДДВ (<span id="vatNote">18</span>%), без фундамент, земјиште и подготвителни работи. Финалната понуда се потврдува по увид на локација и проект.</p>
         <div id="calcErrors" style="margin-top: 14px;"></div>
       </div>

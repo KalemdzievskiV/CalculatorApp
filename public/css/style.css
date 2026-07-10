@@ -122,6 +122,53 @@ table.data .cat-row td { background: var(--panel); font-family: var(--disp); fon
   .no-print { display: none !important; }
   body { background: #fff; }
 }
+
+/* ═══ Админ калкулатор ═══ */
+.calc-admin-grid { display: grid; grid-template-columns: 1.35fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .calc-admin-grid { grid-template-columns: 1fr; } }
+.ci-group > h4 { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; color: var(--ink-soft); margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
+.ci-group > h4::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.ci-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+.calc-sum .cs-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
+.calc-sum .cs-row b { font-family: var(--mono); font-weight: 500; white-space: nowrap; }
+.calc-sum .cs-row.big { font-size: 15px; }
+.calc-sum .cs-row.big b { font-family: var(--disp); font-weight: 700; font-size: 22px; color: var(--accent); }
+.calc-sum .cs-row.grey b { color: var(--ink); font-weight: 600; }
+.calc-sum .cs-row.final { border-bottom: none; font-weight: 600; }
+.calc-sum .cs-row.final b { color: var(--accent); }
+.c-cat { display: flex; justify-content: space-between; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.c-cat:last-child { border-bottom: none; }
+.c-cat b { font-family: var(--mono); font-weight: 500; }
+#cWinTable input { font-family: var(--mono); font-size: 12.5px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 2px; }
+#cWinTable input[type=text] { width: 100%; }
+
+/* ═══ Печатена ПОНУДА ═══ */
+#offerPrint { display: none; }
+.of-h1 { font-family: var(--disp); font-weight: 700; font-size: 22px; margin: 0; letter-spacing: .02em; }
+.of-sub { font-size: 12.5px; color: #444; margin: 2px 0 0; }
+.of-head { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid var(--accent); padding-bottom: 10px; margin-bottom: 14px; }
+.of-meta { font-family: var(--mono); font-size: 11.5px; text-align: right; }
+.of-kv { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; padding: 3px 0; max-width: 620px; }
+.of-kv .dots { flex: 1; border-bottom: 1px dotted #bbb; margin: 0 6px 4px; }
+.of-sec { margin-top: 14px; break-inside: avoid; }
+.of-sec h3 { font-family: var(--disp); font-size: 13.5px; margin: 0 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
+.of-sec li { font-size: 12px; line-height: 1.5; }
+.of-sec ul { margin: 0; padding-left: 18px; }
+.of-spec { display: flex; justify-content: space-between; font-size: 12px; padding: 2px 0; max-width: 560px; }
+.of-spec b { font-family: var(--mono); font-weight: 500; }
+.of-note { font-size: 11px; color: #555; font-style: italic; margin: 4px 0 0; }
+.of-table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 6px; }
+.of-table th, .of-table td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; }
+.of-table th { background: #f0ece4; font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; }
+.of-table td.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+.of-total { background: #322f2b; color: #fff; padding: 10px 14px; display: flex; justify-content: space-between; align-items: baseline; margin-top: 8px; }
+.of-total b { font-family: var(--disp); font-size: 20px; }
+.of-page { break-before: page; }
+@media print {
+  #offerPrint { display: block; padding: 0; }
+  body > *:not(#offerPrint) { display: none !important; }
+  @page { size: A4; margin: 14mm; }
+}
 #offerPrint { display: none; }
 @media print {
   #offerPrint { display: block; padding: 24px; }
@@ -140,10 +187,18 @@ table.data .cat-row td { background: var(--panel); font-family: var(--disp); fon
 /* Херо */
 /* Херо на цела висина; навигацијата се прелева над него */
 .hero-land { position: relative; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; padding: calc(var(--notice-h) + 96px) clamp(20px, 5vw, 64px) clamp(70px, 12vh, 130px); overflow: hidden; }
-.hero-bg { position: absolute; inset: 0; z-index: 0; }
+.hero-bg { position: absolute; inset: 0; z-index: 0; background: repeating-linear-gradient(-45deg, #ede6d7 0 14px, #e7e1d6 14px 28px); }
 .hero-bg .img-ph { height: 100%; }
-/* Крем преод за читливост на текстот врз позадината (и врз идна фотографија) */
-.hero-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, var(--bg) 0%, rgba(251,250,246,.85) 34%, rgba(251,250,246,.4) 68%, rgba(251,250,246,.12) 100%); }
+.hero-bg picture { display: block; width: 100%; height: 100%; }
+/* Банерот е широк (3:1) — кадрирај го надесно за да остане текстот врз чиста површина */
+.hero-bg img { width: 100%; height: 100%; object-fit: cover; object-position: 72% center; display: block; }
+/* Крем преод за читливост на темниот текст врз темната фотографија */
+.hero-bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, var(--bg) 0%, var(--bg) 30%, rgba(251,250,246,.92) 46%, rgba(251,250,246,.55) 70%, rgba(251,250,246,.25) 100%); }
+@media (max-width: 860px) {
+  /* На тесен екран банерот се кадрира премногу — направи го суптилна текстура зад текстот */
+  .hero-bg img { object-position: 65% center; }
+  .hero-bg::after { background: linear-gradient(180deg, var(--bg) 0%, rgba(251,250,246,.92) 45%, rgba(251,250,246,.78) 100%); }
+}
 .hero-inner { position: relative; z-index: 2; max-width: 920px; }
 .hero-meta { display: flex; gap: 14px; flex-wrap: wrap; font-family: var(--mono); font-size: 11px; letter-spacing: .14em; color: var(--ink-soft); margin-bottom: clamp(20px, 3vw, 34px); }
 .hero-meta .d { color: var(--accent); }
@@ -248,15 +303,6 @@ table.data .cat-row td { background: var(--panel); font-family: var(--disp); fon
 .wiz-nav .next { background: var(--accent); border: none; color: #fff; padding: 14px 28px; font-weight: 600; font-size: 14px; border-radius: 2px; cursor: pointer; font-family: inherit; }
 .wiz-nav .next:hover { background: #c23e2f; }
 
-/* Прецизни мерки (напредно) */
-.adv-details { border: 1px dashed #4a453e; border-radius: 3px; padding: 4px 16px 0; }
-.adv-details summary { cursor: pointer; font-family: var(--mono); font-size: 11.5px; letter-spacing: .06em; color: var(--muted); padding: 10px 0 14px; }
-.adv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; padding-bottom: 16px; }
-.adv-grid label { display: block; font-family: var(--mono); font-size: 10px; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
-.adv-grid input { width: 100%; padding: 8px 9px; font-family: var(--mono); font-size: 13px; color: #fff; background: #3c372f; border: 1px solid #4a453e; border-radius: 2px; outline: none; }
-.adv-grid input:focus { border-color: var(--accent); }
-.adv-grid input.overridden { border-color: var(--accent-soft); }
-
 /* Резиме панел (секогаш видлив) */
 .sum-panel { position: sticky; top: 84px; background: #fff; color: var(--ink); padding: clamp(24px, 2.5vw, 34px); border-radius: 4px; }
 .sum-panel .k { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; color: var(--ink-soft); margin-bottom: 6px; }
@@ -282,16 +328,6 @@ table.data .cat-row td { background: var(--panel); font-family: var(--disp); fon
 .recap-total .row:last-child { margin-bottom: 0; }
 .dark-input { width: 100%; padding: 11px 12px; font-family: var(--sans); font-size: 14px; color: #fff; background: #3c372f; border: 1px solid #4a453e; border-radius: 2px; outline: none; }
 .dark-input:focus { border-color: var(--accent); }
-
-/* Дограма уредувач во визардот */
-.win-editor { background: #fff; color: var(--ink); border-radius: 3px; padding: 12px; margin-top: 14px; }
-.win-editor input[type=text] { width: 100%; }
-.win-editor input { font-family: var(--mono); font-size: 12.5px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 2px; }
-
-/* Детална табела во чекор 4 */
-.detail-details { margin-top: 24px; }
-.detail-details summary { cursor: pointer; font-family: var(--mono); font-size: 12px; letter-spacing: .08em; color: var(--accent-soft); padding: 8px 0; }
-.detail-wrap { background: #fff; color: var(--ink); border-radius: 3px; overflow-x: auto; margin-top: 10px; }
 
 /* Контакт / футер */
 .footer-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: clamp(28px, 5vw, 80px); align-items: end; padding-bottom: clamp(48px, 6vw, 90px); border-bottom: 1px solid var(--line); }

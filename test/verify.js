@@ -44,6 +44,21 @@ for (const c of res.byCat) {
   if (RECAP[c.id] != null) check('  ' + c.name, c.eur, RECAP[c.id]);
 }
 
+// ── ПОНУДА (листови PONUDA (2) и PONUDA СИВА) ──
+const offer = require('../data/offer.js');
+const inp = {};
+seed.inputs.forEach((i) => { if (i.type !== 'derived') inp[i.key] = i.def; });
+const areaWithSims = inp.AREA_HOUSE + inp.SIMS + inp.AREA_TERRACE; // 166 + 11 + 12.41
+console.log('\nПОНУДА:');
+check('  Вкупна површина со симсови', areaWithSims, 189.41);
+check('  Клуч на рака — цена/m² со симсови', res.totalEur / areaWithSims, 594.6905521079515);
+check('  Сива фаза — вкупно ЕУР', res.greyEur, 67520.13000788921);
+check('  Сива фаза — цена/m² со симсови', res.greyEur / areaWithSims, 356.47605727199834);
+check('  Сива фаза — вкупно ДЕН', res.greyEur * seed.settings.eurRate, 4186248.060489131);
+const payExpected = [4888590.646404892, 1047555.1385153336, 349185.0461717779, 349185.0461717779, 349185.0461717779];
+offer.payment.forEach((p, i) => check(`  Плаќање ${(p.pct * 100).toFixed(0)}% ${p.desc}`, res.totalMkd * p.pct, payExpected[i]));
+check('  Плаќање — збир на проценти', offer.payment.reduce((s, p) => s + p.pct, 0), 1);
+
 if (res.errors.length) {
   console.log('\nГрешки од моторот:');
   res.errors.forEach((e) => console.log('  -', e));
