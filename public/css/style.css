@@ -429,6 +429,9 @@ body.notice-closed .nav-hero { top: 0; }
 .lang-switch a.active { color: var(--accent); border-color: var(--line); background: var(--panel); }
 .nav-burger { display: none; background: none; border: none; font-size: 22px; color: var(--ink); cursor: pointer; }
 .lang-mobile { display: none; }
+.admin-link { display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 2px; color: var(--ink-soft); flex: none; }
+.admin-link:hover { color: var(--accent); border-color: var(--accent); }
+.admin-link svg { width: 17px; height: 17px; }
 
 /* Перформанси */
 .perf-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1px; background: var(--line); border: 1px solid var(--line); margin-top: clamp(36px,4vw,56px); }
