@@ -323,20 +323,39 @@
       if (e.message !== '401') body.innerHTML = `<tr><td colspan="4" class="muted" style="text-align:center;padding:24px;">Грешка: ${esc(e.message)}</td></tr>`;
       return;
     }
-    body.innerHTML = quotes.length ? quotes.map((q) => `<tr data-id="${q.id}">
-      <td class="mono muted">${new Date(q.createdAt).toLocaleString('mk-MK')}</td>
-      <td>${esc(q.client)}</td>
-      <td class="num">${fmt(q.totalEur)} €</td>
-      <td>
-        <a class="icon-btn" href="index.html?quote=${q.id}" title="Отвори во калкулатор">↗</a>
+    quoteCache = {};
+    quotes.forEach((q) => { quoteCache[q.id] = q; });
+    const area = (qt) => {
+      const i = qt.inputs || {};
+      const a = (Number(i.AREA_HOUSE) || 0) + (Number(i.AREA_TERRACE) || 0);
+      return a ? q(a) + ' m²' : '—';
+    };
+    const sys = (qt) => {
+      const i = qt.inputs || {};
+      return i.SIP ? 'СИП' : i.KAMENA ? 'Камена' : '—';
+    };
+    body.innerHTML = quotes.length ? quotes.map((qt) => `<tr class="q-row" data-id="${qt.id}" style="cursor:pointer;">
+      <td class="mono muted">${new Date(qt.createdAt).toLocaleString('mk-MK')}</td>
+      <td>${esc(qt.client)}</td>
+      <td class="num">${area(qt)}</td>
+      <td class="num">${sys(qt)}</td>
+      <td class="num">${fmt(qt.totalEur)} €</td>
+      <td style="white-space:nowrap;">
+        <button class="icon-btn open" title="Отвори во калкулатор">↗</button>
         <button class="icon-btn del" title="Избриши">🗑</button>
       </td>
-    </tr>`).join('') : '<tr><td colspan="4" class="muted" style="text-align:center;padding:24px;">Нема зачувани понуди.</td></tr>';
+    </tr>`).join('') : '<tr><td colspan="6" class="muted" style="text-align:center;padding:24px;">Нема зачувани понуди.</td></tr>';
+    const openQuote = (id) => { const qt = quoteCache[id]; if (qt) loadQuoteIntoCalc(qt); };
+    body.querySelectorAll('.q-row').forEach((tr) => {
+      tr.querySelector('.open').onclick = (e) => { e.stopPropagation(); openQuote(tr.dataset.id); };
+      tr.onclick = () => openQuote(tr.dataset.id);
+    });
     body.querySelectorAll('.del').forEach((b) => {
-      b.onclick = async () => {
+      b.onclick = async (e) => {
+        e.stopPropagation();
         const id = b.closest('tr').dataset.id;
         if (!confirm('Избриши понуда?')) return;
-        try { await api('/api/admin/quotes/' + id, 'DELETE'); } catch (e) { if (e.message !== '401') flash('Грешка: ' + e.message); return; }
+        try { await api('/api/admin/quotes/' + id, 'DELETE'); } catch (err) { if (err.message !== '401') flash('Грешка: ' + err.message); return; }
         renderQuotes();
       };
     });
@@ -461,6 +480,7 @@
   let offerTpl = null;
   let offerErr = '';
   let calcRes = null;
+  let quoteCache = {};
   const calc = { inputs: {}, windows: [], discountEur: 0, client: '', date: '', covered: 0, open: null, outerH: 4.6 };
 
   const rate = () => cfg.settings.eurRate || 62;
@@ -594,6 +614,30 @@
     renderCalcInputs();
     renderCalcWindows();
     recalcAdmin();
+  }
+
+  // Вчитува зачувана понуда во калкулаторот (полн приказ + печатење)
+  function loadQuoteIntoCalc(qt) {
+    calc.inputs = {};
+    cfg.inputs.forEach((i) => { if (i.type !== 'derived') calc.inputs[i.key] = i.def; });
+    Object.assign(calc.inputs, qt.inputs || {});
+    calc.windows = (qt.windows && qt.windows.length)
+      ? JSON.parse(JSON.stringify(qt.windows))
+      : JSON.parse(JSON.stringify(cfg.windowsDefaults || []));
+    calc.discountEur = qt.discountEur || 0;
+    calc.client = qt.client === 'Без име' ? '' : (qt.client || '');
+    calc.date = qt.createdAt ? new Date(qt.createdAt).toLocaleDateString('mk-MK') : today();
+    calc.covered = 0;
+    calc.open = null;
+    calc.outerH = 4.6;
+    calc.loadedId = qt.id;
+    document.querySelector('.tabs button[data-tab="calc"]').click();
+    syncCalcFields();
+    renderCalcInputs();
+    renderCalcWindows();
+    recalcAdmin();
+    $('#cNote').style.color = 'var(--ink-soft)';
+    $('#cNote').textContent = 'Вчитана зачувана понуда од ' + calc.date + (calc.client ? ' · ' + calc.client : '');
   }
 
   $('#cReset').onclick = () => { calcDefaults(); calc.date = today(); syncCalcFields(); renderCalcInputs(); renderCalcWindows(); recalcAdmin(); };
