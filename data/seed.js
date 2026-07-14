@@ -336,4 +336,4 @@ const windowsDefaults = [
   { name: 'гаражна врата роло', qty: 1, priceEur: 1200 },
 ];
 
-module.exports = { settings, inputGroups, inputs, categories, materials, windowsDefaults, quotes: [], inquiries: [] };
+module.exports = { settings, inputGroups, inputs, categories, materials, windowsDefaults, quotes: [], inquiries: [], analytics: { daily: {} } };

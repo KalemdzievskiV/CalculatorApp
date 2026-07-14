@@ -32,6 +32,13 @@ function saveDb() {
   fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
   fs.renameSync(tmp, DB_FILE);
 }
+// Одложено зачувување — избегнува запис на дискот при секој настан (аналитика)
+let savePending = false;
+function scheduleSave() {
+  if (savePending) return;
+  savePending = true;
+  setTimeout(() => { savePending = false; try { saveDb(); } catch (e) { /* тивко */ } }, 4000);
+}
 
 // Админ лозинката од околина е авторитативна при јавен деплој
 if (process.env.MDA_ADMIN_PASSWORD) {
@@ -68,6 +75,75 @@ function noteLoginFail(ip) {
   const rec = loginAttempts.get(ip) || { count: 0, first: Date.now() };
   rec.count++;
   loginAttempts.set(ip, rec);
+}
+
+// ── Аналитика (без колачиња, агрегирано по ден) ──
+const BOT_RE = /bot|crawl|spider|slurp|bingpreview|facebookexternalhit|whatsapp|telegram|embedly|quora|pinterest|headless|phantom|puppeteer|playwright|python-requests|curl\/|wget|axios|go-http|java\/|okhttp|semrush|ahrefs|mj12|dotbot|petalbot|yandex|baidu|lighthouse|gtmetrix|pingdom|uptime/i;
+const EVENTS = ['calc_open', 'calc_summary', 'quote_request', 'inquiry', 'model_open', 'phone_click'];
+let anDay = '';
+let anSeen = new Set(); // хешеви на посетители за тековниот ден (ефемерно, за приближни уникати)
+
+function todayStr() { return new Date().toISOString().slice(0, 10); }
+function dayBucket() {
+  db.analytics = db.analytics || { daily: {} };
+  const key = todayStr();
+  if (key !== anDay) { anDay = key; anSeen = new Set(); }
+  if (!db.analytics.daily[key]) {
+    db.analytics.daily[key] = { pageviews: 0, visits: 0, pages: {}, devices: {}, browsers: {}, referrers: {}, events: {} };
+  }
+  // задржи максимум ~730 дена
+  const keys = Object.keys(db.analytics.daily);
+  if (keys.length > 760) keys.sort().slice(0, keys.length - 730).forEach((k) => delete db.analytics.daily[k]);
+  return db.analytics.daily[key];
+}
+function pageKey(p) {
+  p = String(p || '').split('?')[0].split('#')[0];
+  if (p === '' || p === '/' || p === '/index.html') return 'Насловна';
+  if (p === '/models.html') return 'Модели';
+  return 'Друго';
+}
+function refKey(ref, host) {
+  if (!ref) return 'Директно';
+  try {
+    const h = new URL(ref).hostname.replace(/^www\./, '');
+    if (!h || h === host) return 'Директно';
+    if (/google\./.test(h)) return 'Google';
+    if (/facebook\.|fb\./.test(h)) return 'Facebook';
+    if (/instagram\./.test(h)) return 'Instagram';
+    return h.slice(0, 40);
+  } catch { return 'Директно'; }
+}
+function deviceKey(ua) { return /Mobi|Android|iPhone|iPad|iPod/i.test(ua) ? 'Мобилен' : 'Десктоп'; }
+function browserKey(ua) {
+  if (/Edg\//.test(ua)) return 'Edge';
+  if (/OPR\/|Opera/.test(ua)) return 'Opera';
+  if (/SamsungBrowser/.test(ua)) return 'Samsung';
+  if (/Firefox\//.test(ua)) return 'Firefox';
+  if (/Chrome\//.test(ua)) return 'Chrome';
+  if (/Safari\//.test(ua)) return 'Safari';
+  return 'Друго';
+}
+function bump(obj, k) { obj[k] = (obj[k] || 0) + 1; }
+
+function track(req, body) {
+  const ua = String(req.headers['user-agent'] || '');
+  if (!ua || BOT_RE.test(ua)) return; // игнорирај ботови и празни UA
+  const day = dayBucket();
+  // Порака за настан (никогаш не се брои како преглед; непознати имиња се игнорираат)
+  if (body && body.event !== undefined) {
+    if (EVENTS.includes(body.event)) { bump(day.events, body.event); scheduleSave(); }
+    return;
+  }
+  // Преглед на страница
+  day.pageviews++;
+  bump(day.pages, pageKey(body && body.path));
+  bump(day.devices, deviceKey(ua));
+  bump(day.browsers, browserKey(ua));
+  bump(day.referrers, refKey(body && body.ref, (req.headers.host || '').replace(/^www\./, '')));
+  // приближен уникат: хеш на IP+UA+ден (не се чува, само во меморија за деноноќието)
+  const h = crypto.createHash('sha256').update(clientIp(req) + '|' + ua + '|' + anDay).digest('hex');
+  if (!anSeen.has(h)) { anSeen.add(h); day.visits++; }
+  scheduleSave();
 }
 
 // ── Помошни ──
@@ -114,6 +190,14 @@ const server = http.createServer(async (req, res) => {
   try {
     // ── Health check (за хостинг платформите) ──
     if (p === '/healthz') return json(res, 200, { ok: true });
+
+    // ── Аналитика: прием на настани (јавно, без колачиња) ──
+    if (p === '/api/track' && req.method === 'POST') {
+      let body = {};
+      try { body = await readBody(req); } catch { /* игнорирај лош JSON */ }
+      try { track(req, body); } catch (e) { /* никогаш не паѓа поради аналитика */ }
+      res.writeHead(204); return res.end();
+    }
 
     // ── API ──
     if (p === '/api/config' && req.method === 'GET') return json(res, 200, publicConfig());
@@ -194,6 +278,15 @@ const server = http.createServer(async (req, res) => {
         db.inquiries = (db.inquiries || []).filter((q) => q.id !== delInq[1]);
         saveDb();
         return json(res, 200, { ok: true });
+      }
+
+      // Аналитика — агрегирани дневни податоци (само за админ)
+      if (what === 'analytics' && req.method === 'GET') {
+        const daily = (db.analytics && db.analytics.daily) || {};
+        const keys = Object.keys(daily).sort().slice(-180); // последни ~180 дена
+        const out = {};
+        keys.forEach((k) => { out[k] = daily[k]; });
+        return json(res, 200, { daily: out });
       }
 
       // Шаблони за ПОНУДА (клуч на рака / сива фаза) — само за админ

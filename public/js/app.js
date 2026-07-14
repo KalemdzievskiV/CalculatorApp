@@ -185,6 +185,7 @@
     $('#backBtn').style.visibility = state.step > 1 ? 'visible' : 'hidden';
     $('#nextBtn').style.display = state.step < 4 ? '' : 'none';
     $('#nextBtn').textContent = state.step === 3 ? 'Прикажи резиме →' : 'Следно →';
+    if (state.step === 4 && window.mdaTrack) window.mdaTrack('calc_summary');
     renderPills();
   }
   function renderPills() {
@@ -265,7 +266,7 @@
   // ── Попуст / клиент ──
   $('#discount').oninput = (e) => { state.discountEur = parseFloat(e.target.value) || 0; recalc(); };
   $('#clientName').oninput = (e) => { state.client = e.target.value; };
-  $('#sumCta').onclick = () => { setStep(4); document.getElementById('calc').scrollIntoView({ behavior: 'smooth' }); };
+  $('#sumCta').onclick = () => { if (window.mdaTrack) window.mdaTrack('quote_request'); setStep(4); document.getElementById('calc').scrollIntoView({ behavior: 'smooth' }); };
 
   // ── Зачувување понуда ──
   $('#saveBtn').onclick = async () => {
@@ -404,6 +405,15 @@
   recalc();
   initReveal();
 
+  // Аналитика: калкулаторот влезен во видокруг (еднаш по сесија)
+  const calcSec = document.getElementById('calc');
+  if (calcSec && 'IntersectionObserver' in window) {
+    const co = new IntersectionObserver((ents) => {
+      ents.forEach((en) => { if (en.isIntersecting) { if (window.mdaTrack) window.mdaTrack('calc_open'); co.disconnect(); } });
+    }, { threshold: 0.25 });
+    co.observe(calcSec);
+  }
+
   const quoteId = new URLSearchParams(location.search).get('quote');
   if (quoteId) {
     try {
@@ -489,6 +499,7 @@
         form.reset();
         note.style.color = '#2e7d32';
         note.textContent = 'Фала на вашето прашање — ќе ве информираме наскоро.';
+        if (window.mdaTrack) window.mdaTrack('inquiry');
       } catch (err) {
         note.style.color = 'var(--accent)';
         note.textContent = 'Грешка при испраќање. Обидете се повторно или јавете се на 071 336 108.';

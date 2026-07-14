@@ -64,6 +64,7 @@
   }
   function openModal(m) {
     if (!m) return;
+    if (window.mdaTrack) window.mdaTrack('model_open');
     const imgs = [m.imageFull, ...(m.gallery || [])].filter(Boolean);
     const uniq = [...new Set(imgs)];
     modalBody.innerHTML = `

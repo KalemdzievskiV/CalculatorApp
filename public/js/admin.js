@@ -80,6 +80,7 @@
       if (b.dataset.tab === 'quotes') renderQuotes();
       if (b.dataset.tab === 'inquiries') renderInquiries();
       if (b.dataset.tab === 'calc') renderCalc();
+      if (b.dataset.tab === 'analytics') renderAnalytics();
     };
   });
 
@@ -411,6 +412,171 @@
       };
     });
   }
+
+  // ══ АНАЛИТИКА ══
+  let anData = null; // { daily: {…} }
+  let anDays = 30;
+  const AN_PV = '#db4b3b';   // прегледи (валидиран пар)
+  const AN_VS = '#0e9aa8';   // посети
+  const EV_LABEL = { calc_open: 'Отворен калкулатор', calc_summary: 'Стигнати до резиме', quote_request: 'Побарана понуда', inquiry: 'Испратено барање', model_open: 'Отворен модел', phone_click: 'Клик на телефон' };
+  const int0 = (v) => new Intl.NumberFormat('mk-MK').format(Math.round(v));
+
+  function lastNDates(n) {
+    const out = [];
+    const d = new Date();
+    for (let i = n - 1; i >= 0; i--) { const x = new Date(d); x.setDate(d.getDate() - i); out.push(x.toISOString().slice(0, 10)); }
+    return out;
+  }
+  function sumRange(daily, dates) {
+    const acc = { pageviews: 0, visits: 0, pages: {}, devices: {}, browsers: {}, referrers: {}, events: {} };
+    const add = (dst, src) => { for (const k in src) dst[k] = (dst[k] || 0) + src[k]; };
+    dates.forEach((dt) => {
+      const d = daily[dt]; if (!d) return;
+      acc.pageviews += d.pageviews || 0; acc.visits += d.visits || 0;
+      add(acc.pages, d.pages || {}); add(acc.devices, d.devices || {});
+      add(acc.browsers, d.browsers || {}); add(acc.referrers, d.referrers || {}); add(acc.events, d.events || {});
+    });
+    return acc;
+  }
+  function topList(obj, n) {
+    return Object.entries(obj).sort((a, b) => b[1] - a[1]).slice(0, n || 6);
+  }
+  function delta(cur, prev) {
+    if (!prev) return cur ? { cls: 'up', txt: '▲ ново' } : { cls: 'flat', txt: '—' };
+    const p = Math.round(((cur - prev) / prev) * 100);
+    if (p > 0) return { cls: 'up', txt: '▲ ' + p + '%' };
+    if (p < 0) return { cls: 'down', txt: '▼ ' + Math.abs(p) + '%' };
+    return { cls: 'flat', txt: '0%' };
+  }
+
+  // SVG линиско-површински график: прегледи (површина+линија) + посети (линија)
+  function timeChart(dates, daily) {
+    const W = 720, H = 220, padL = 34, padR = 12, padT = 14, padB = 26;
+    const pv = dates.map((d) => (daily[d] && daily[d].pageviews) || 0);
+    const vs = dates.map((d) => (daily[d] && daily[d].visits) || 0);
+    const max = Math.max(1, ...pv, ...vs);
+    const nMax = Math.ceil(max / 4) * 4 || 4;
+    const x = (i) => padL + (dates.length <= 1 ? 0 : (i / (dates.length - 1)) * (W - padL - padR));
+    const y = (v) => padT + (1 - v / nMax) * (H - padT - padB);
+    const path = (arr) => arr.map((v, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(v).toFixed(1)).join(' ');
+    const area = `${path(pv)} L${x(pv.length - 1).toFixed(1)} ${y(0)} L${x(0).toFixed(1)} ${y(0)} Z`;
+    // y-мрежа (4 линии)
+    let grid = '';
+    for (let g = 0; g <= 4; g++) {
+      const yy = padT + (g / 4) * (H - padT - padB); const val = Math.round(nMax * (1 - g / 4));
+      grid += `<line x1="${padL}" y1="${yy.toFixed(1)}" x2="${W - padR}" y2="${yy.toFixed(1)}" stroke="#e7e1d6" stroke-width="1"/>`;
+      grid += `<text x="${padL - 6}" y="${(yy + 3).toFixed(1)}" text-anchor="end" font-family="IBM Plex Mono" font-size="9" fill="#9a9ea3">${val}</text>`;
+    }
+    // x-ознаки (макс ~6)
+    let xlab = '';
+    const step = Math.max(1, Math.ceil(dates.length / 6));
+    dates.forEach((d, i) => { if (i % step === 0 || i === dates.length - 1) xlab += `<text x="${x(i).toFixed(1)}" y="${H - 8}" text-anchor="middle" font-family="IBM Plex Mono" font-size="9" fill="#9a9ea3">${d.slice(5)}</text>`; });
+    const dotsV = vs.map((v, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="0" fill="${AN_VS}"/>`).join('');
+    return { svg: `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img">
+        ${grid}
+        <path d="${area}" fill="${AN_PV}" fill-opacity="0.12"/>
+        <path d="${path(pv)}" fill="none" stroke="${AN_PV}" stroke-width="2" stroke-linejoin="round"/>
+        <path d="${path(vs)}" fill="none" stroke="${AN_VS}" stroke-width="2" stroke-linejoin="round"/>
+        ${dotsV}${xlab}
+        <line id="anCross" x1="0" y1="${padT}" x2="0" y2="${H - padB}" stroke="#322f2b" stroke-width="1" opacity="0"/>
+      </svg>`, geo: { W, H, padL, padR, x, y, pv, vs } };
+  }
+
+  function barList(items, total, empty) {
+    if (!items.length) return `<div class="an-empty">${esc(empty || 'Нема податоци')}</div>`;
+    const max = Math.max(...items.map((i) => i[1]), 1);
+    return items.map(([k, v]) => `<div class="an-bar-row">
+      <span class="lbl" title="${esc(k)}">${esc(k)}</span>
+      <span class="track"><i style="width:${(v / max * 100).toFixed(1)}%"></i></span>
+      <span class="val">${int0(v)}</span></div>`).join('');
+  }
+
+  async function renderAnalytics() {
+    const host = $('#anBody');
+    if (!anData) {
+      host.innerHTML = '<div class="an-empty">Се вчитува…</div>';
+      try { anData = await api('/api/admin/analytics'); }
+      catch (e) { if (e.message !== '401') host.innerHTML = `<div class="error-note">Грешка: ${esc(e.message)}</div>`; return; }
+    }
+    const daily = anData.daily || {};
+    const dates = lastNDates(anDays);
+    const prevDates = lastNDates(anDays * 2).slice(0, anDays);
+    const cur = sumRange(daily, dates);
+    const prev = sumRange(daily, prevDates);
+    const kpi = (k, val, prevVal) => { const d = delta(val, prevVal); return `<div class="an-kpi"><div class="k">${k}</div><div class="v">${int0(val)}</div><div class="d ${d.cls}">${d.txt}</div></div>`; };
+
+    const chart = timeChart(dates, daily);
+    const dev = cur.devices; const devTotal = (dev['Мобилен'] || 0) + (dev['Десктоп'] || 0);
+    const mob = dev['Мобилен'] || 0, desk = dev['Десктоп'] || 0;
+    const funnelSteps = ['calc_open', 'calc_summary', 'quote_request', 'inquiry'];
+    const fmax = Math.max(cur.events.calc_open || 0, 1);
+
+    host.innerHTML = `
+      <div class="an-kpis">
+        ${kpi('Прегледи', cur.pageviews, prev.pageviews)}
+        ${kpi('Посети', cur.visits, prev.visits)}
+        ${kpi('Побарана понуда', cur.events.quote_request || 0, prev.events.quote_request || 0)}
+        ${kpi('Испратени барања', cur.events.inquiry || 0, prev.events.inquiry || 0)}
+      </div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <div class="card-head">
+          <h3>Сообраќај</h3>
+          <div class="an-legend"><span><i style="background:${AN_PV}"></i>Прегледи</span><span><i style="background:${AN_VS}"></i>Посети</span></div>
+        </div>
+        <div class="card-body"><div class="an-chart" id="anChart">${chart.svg}<div class="an-tip" id="anTip"></div></div></div>
+      </div>
+
+      <div class="an-grid2">
+        <div class="card"><div class="card-head"><h3>Најпосетени страници</h3></div>
+          <div class="card-body">${barList(topList(cur.pages), cur.pageviews, 'Нема прегледи')}</div></div>
+        <div class="card"><div class="card-head"><h3>Извори на сообраќај</h3></div>
+          <div class="card-body">${barList(topList(cur.referrers), cur.pageviews, 'Нема податоци')}</div></div>
+      </div>
+
+      <div class="an-grid2" style="margin-top:16px;">
+        <div class="card"><div class="card-head"><h3>Уреди</h3></div>
+          <div class="card-body">
+            ${devTotal ? `<div class="an-split">
+              <span style="background:${AN_PV};width:${(mob / devTotal * 100).toFixed(1)}%">${mob ? Math.round(mob / devTotal * 100) + '%' : ''}</span>
+              <span style="background:#9a9ea3;width:${(desk / devTotal * 100).toFixed(1)}%">${desk ? Math.round(desk / devTotal * 100) + '%' : ''}</span>
+            </div>
+            <div class="an-split-legend"><span>📱 Мобилен · ${int0(mob)}</span><span>🖥 Десктоп · ${int0(desk)}</span></div>` : '<div class="an-empty">Нема податоци</div>'}
+            <div style="margin-top:16px;">${barList(topList(cur.browsers, 5), 0, 'Нема податоци')}</div>
+          </div></div>
+        <div class="card"><div class="card-head"><h3>Инка (конверзија)</h3></div>
+          <div class="card-body">${funnelSteps.map((s) => {
+            const v = cur.events[s] || 0; const conv = fmax ? Math.round(v / fmax * 100) : 0;
+            return `<div class="an-funnel-row"><span class="lbl">${esc(EV_LABEL[s])}</span>
+              <span class="track"><i style="width:${Math.max(conv, v ? 6 : 0)}%">${int0(v)}</i></span>
+              <span class="conv">${conv}%</span></div>`;
+          }).join('')}
+          <p class="hint" style="margin-top:8px;">Процентот е во однос на „Отворен калкулатор".</p></div></div>
+      </div>`;
+
+    // Ховер на графикот
+    const chartEl = $('#anChart'), tip = $('#anTip'), cross = document.getElementById('anCross');
+    const svg = chartEl.querySelector('svg'), g = chart.geo;
+    chartEl.onmousemove = (e) => {
+      const r = svg.getBoundingClientRect();
+      const sx = (e.clientX - r.left) / r.width * g.W;
+      let idx = Math.round((sx - g.padL) / ((g.W - g.padL - g.padR) / Math.max(1, dates.length - 1)));
+      idx = Math.max(0, Math.min(dates.length - 1, idx));
+      const px = g.x(idx) / g.W * r.width;
+      cross.setAttribute('x1', g.x(idx)); cross.setAttribute('x2', g.x(idx)); cross.setAttribute('opacity', '0.35');
+      tip.style.opacity = '1'; tip.style.left = px + 'px'; tip.style.top = (e.clientY - r.top - 12) + 'px';
+      tip.innerHTML = `<b>${dates[idx]}</b><br>Прегледи: ${int0(g.pv[idx])}<br>Посети: ${int0(g.vs[idx])}`;
+    };
+    chartEl.onmouseleave = () => { tip.style.opacity = '0'; cross.setAttribute('opacity', '0'); };
+  }
+  $('#anRange').querySelectorAll('button').forEach((b) => {
+    b.onclick = () => {
+      $('#anRange').querySelectorAll('button').forEach((x) => x.classList.remove('active'));
+      b.classList.add('active');
+      anDays = +b.dataset.days;
+      renderAnalytics();
+    };
+  });
 
   // ══ ПОДЕСУВАЊА ══
   function renderSettings() {
