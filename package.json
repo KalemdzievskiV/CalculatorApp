@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "verify": "node test/verify.js"
+    "verify": "node test/verify.js",
+    "pull-db": "node scripts/pull-db.js"
   },
   "engines": {
     "node": ">=18"

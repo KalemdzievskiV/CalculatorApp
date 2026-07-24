@@ -2,7 +2,25 @@
 const engine = require('../public/js/engine.js');
 const seed = require('../data/seed.js');
 
-const res = engine.compute(seed, { windows: seed.windowsDefaults });
+/*
+ * Ставките што порано имаа фиксна количина (санитарии, ОСБ, гаражни плочки, скеле,
+ * метална конструкција) сега се управуваат од калкулаторот и стандардно се ИСКЛУЧЕНИ.
+ * За да се спореди со Excel-от, тука се вклучуваат со истите количини како порано —
+ * ако сите проверки поминат, значи параметризацијата не ја смени пресметката.
+ */
+const EXCEL_SCENARIO = {
+  WC_SANITARY: 3,      // беше фиксно 3 кај V03–V06 (и 18 = 3×6 кај V07/V08)
+  OSB_POD: 90,         // беше фиксно 90 кај PD02
+  GARAZA_PLOCHKI: 18,  // беше фиксно 18 кај PD16
+  SKELE: 1,            // беше фиксно 1 кај L10
+  METALNA: 1,          // беше фиксно 1 кај X01
+};
+
+const defaults = {};
+seed.inputs.forEach((i) => { if (i.type !== 'derived') defaults[i.key] = i.def; });
+const excelInputs = Object.assign({}, defaults, EXCEL_SCENARIO);
+
+const res = engine.compute(seed, { inputs: excelInputs, windows: seed.windowsDefaults });
 
 const EXPECTED = {
   totalEur: 112640.33747476709,
@@ -46,8 +64,7 @@ for (const c of res.byCat) {
 
 // ── ПОНУДА (листови PONUDA (2) и PONUDA СИВА) ──
 const offer = require('../data/offer.js');
-const inp = {};
-seed.inputs.forEach((i) => { if (i.type !== 'derived') inp[i.key] = i.def; });
+const inp = excelInputs;
 const areaWithSims = inp.AREA_HOUSE + inp.SIMS + inp.AREA_TERRACE; // 166 + 11 + 12.41
 console.log('\nПОНУДА:');
 check('  Вкупна површина со симсови', areaWithSims, 189.41);
@@ -64,6 +81,47 @@ if (res.errors.length) {
   res.errors.forEach((e) => console.log('  -', e));
   fail++;
 }
+
+// ── Новите можности на моторот ──
+console.log('\nПАРАМЕТРИЗАЦИЈА:');
+const run = (over) => engine.compute(seed, { inputs: Object.assign({}, defaults, over), windows: seed.windowsDefaults });
+const qtyOf = (r, code) => { const x = r.rows.find((z) => z.code === code); return x ? x.qty : 0; };
+const priceOf = (r, code) => { const x = r.rows.find((z) => z.code === code); return x ? x.price : 0; };
+
+// Стандардно сè е исклучено — ниту една од порано фиксните ставки не се наплаќа
+const off = run({});
+['V03', 'V04', 'V05', 'V06', 'V07', 'V08', 'PD02', 'PD16', 'L10', 'X01'].forEach((c) =>
+  check('  стандардно исклучено ' + c, qtyOf(off, c), 0));
+
+// Условено поле: количината важи само ако придружниот прекинувач е вклучен
+check('  условено — премиум фасада исклучена', qtyOf(run({ PREMIUM_FAS: 0, PREMIUM_FAS_M2: 40 }), 'F18'), 0);
+check('  условено — премиум фасада вклучена', qtyOf(run({ PREMIUM_FAS: 1, PREMIUM_FAS_M2: 40 }), 'F18'), 40);
+
+// Ексклузивност: не смее и камена и СИП да се пресметаат истовремено
+const both = run({ KAMENA: 1, SIP: 1 });
+check('  ексклузивно — СИП игнориран кога камена е вклучена', qtyOf(both, 'S01'), 0);
+if (!both.errors.some((e) => e.includes('Ексклузивна група'))) {
+  console.log('FAIL   ексклузивно — недостига предупредување за двоен избор');
+  fail++;
+} else {
+  console.log('OK     ексклузивно — предупредување за двоен избор');
+}
+
+// Коефициент за цена преку PRICE
+check('  коефициент — боја на лим ×1', priceOf(run({ BOJA_LIM: 1 }), 'R03'), 1450);
+check('  коефициент — боја на лим ×1.4', priceOf(run({ BOJA_LIM: 1.4 }), 'R03'), 2030);
+
+// Цена по проект наместо глобална
+check('  цена по проект — метална конструкција', priceOf(run({ METALNA: 1, METALNA_CENA: 250000 }), 'X01'), 250000);
+
+// Коефициент врз дограмата (target: 'windows')
+const w1 = run({}).rows.find((r) => r.isWindow);
+const w2 = run({ BOJA_PROZ_NADV: 1.2 }).rows.find((r) => r.isWindow);
+check('  коефициент — боја на прозори ×1.2', w2.price, w1.price * 1.2);
+
+// Санитариите следат „без галантерија"
+check('  без галантерија — санитарии', qtyOf(run({ WC_SANITARY: 3, BEZ_GALANT: 1 }), 'V03'), 0);
+check('  без галантерија — електрика', qtyOf(run({ ELEKTRIKA: 1, EL_BEZ_GALANT: 1 }), 'E37'), 0);
 
 console.log(fail ? `\n${fail} ПРОВЕРКИ ПАДНАА` : '\nСИТЕ ПРОВЕРКИ ПОМИНАА ✓');
 process.exit(fail ? 1 : 0);

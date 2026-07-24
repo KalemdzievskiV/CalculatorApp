@@ -188,6 +188,28 @@
       let v = state.inputs && state.inputs[inp.key] != null ? state.inputs[inp.key] : inp.def;
       vars[inp.key] = Number(v) || 0;
     }
+
+    // Ексклузивни групи: во иста група смее да биде вклучен само еден прекинувач.
+    // Ако се вклучени повеќе, првиот по редослед победува — спречува двојно наплаќање
+    // (пр. КАМЕНА и СИП, ЛИМ и ПУР кров, ламинат и плочки).
+    const exWinner = {};
+    for (const inp of db.inputs) {
+      if (inp.type !== 'boolean' || !inp.exclusive || !vars[inp.key]) continue;
+      if (exWinner[inp.exclusive]) {
+        vars[inp.key] = 0;
+        errors.push('Ексклузивна група „' + inp.exclusive + '": ' + inp.key +
+          ' е игнориран бидејќи ' + exWinner[inp.exclusive] + ' е веќе вклучен.');
+      } else {
+        exWinner[inp.exclusive] = inp.key;
+      }
+    }
+
+    // Условени полиња: количината/цената важи само ако придружниот прекинувач е вклучен.
+    // Внесената вредност се чува во state — само пресметката ја гледа како 0.
+    for (const inp of db.inputs) {
+      if (inp.gate && !vars[inp.gate]) vars[inp.key] = 0;
+    }
+
     vars.WINDOWS_QTY = windows.reduce((s, w) => s + (Number(w.qty) || 0), 0);
     // Изведени променливи (по редослед на дефинирање)
     for (const inp of db.inputs) {
@@ -231,7 +253,10 @@
       visiting['p' + code] = true;
       let p = Number(mat.price) || 0;
       if (mat.priceFormula) {
-        try { p = evalAst(parse(mat.priceFormula), ctx); }
+        // Во формулата за цена, PRICE е основната цена на ставката — така коефициентите
+        // (пр. боја на лим) се пишуваат како `PRICE * BOJA_LIM` без да се повторува бројот.
+        const priceCtx = { vars: Object.assign({}, vars, { PRICE: p }), qty: qtyOf, total: totalOf };
+        try { p = evalAst(parse(mat.priceFormula), priceCtx); }
         catch (e) { errors.push(code + ' цена: ' + e.message); }
       }
       delete visiting['p' + code];
@@ -253,10 +278,19 @@
         qty, price, totalMkd, eur: totalMkd / rate, grey: mat.grey || 0,
       });
     }
+    // Коефициенти што важат за целата дограма (пр. боја надвор/внатре).
+    // Секој параметар со target:'windows' се множи во цената на прозорите.
+    let winFactor = 1;
+    for (const inp of db.inputs) {
+      if (inp.target !== 'windows') continue;
+      const f = vars[inp.key];
+      if (f > 0) winFactor *= f;
+    }
+
     // Динамички редови за прозори → во ДОГРАМА
     for (const w of windows) {
       const qty = Number(w.qty) || 0;
-      const priceMkd = (Number(w.priceEur) || 0) * rate;
+      const priceMkd = (Number(w.priceEur) || 0) * rate * winFactor;
       const totalMkd = qty * priceMkd;
       rows.push({
         code: null, cat: 'DOGRAMA', name: w.name || 'прозор', unit: 'кол',

@@ -18,11 +18,20 @@ const PUBLIC = path.join(ROOT, 'public');
 // ── База (JSON датотека, се создава од seed при прв старт) ──
 fs.mkdirSync(path.dirname(DB_FILE), { recursive: true });
 let db;
+const seed = require('./data/seed.js');
+const { migrate, SCHEMA_VERSION } = require('./data/migrate.js');
 if (fs.existsSync(DB_FILE)) {
   db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
   console.log(`✔ База ВЧИТАНА од постоечка датотека: ${DB_FILE} (податоците се зачувани).`);
+  // Резервна копија пред миграција — ако нешто тргне наопаку, .bak е точно претходната состојба.
+  if ((Number(db.schemaVersion) || 0) < SCHEMA_VERSION) {
+    fs.copyFileSync(DB_FILE, DB_FILE + '.bak');
+    console.log(`  Резервна копија пред миграција: ${DB_FILE}.bak`);
+    if (migrate(db, seed)) saveDb();
+  }
 } else {
-  db = JSON.parse(JSON.stringify(require('./data/seed.js'))); // длабока копија на seed
+  db = JSON.parse(JSON.stringify(seed)); // длабока копија на seed
+  db.schemaVersion = SCHEMA_VERSION;
   saveDb();
   console.log(`⚠ Нема постоечка база — СОЗДАДЕНА од seed на: ${DB_FILE}.`);
   console.log(`  Ако ова се појавува по СЕКОЈ редеплој, значи ${path.dirname(DB_FILE)} НЕ е на постојан Railway Volume — измените нема да се чуваат.`);
@@ -317,8 +326,13 @@ const server = http.createServer(async (req, res) => {
         db.settings = Object.assign({}, body.settings || {}, { adminPassword: keepPw });
         db.quotes = Array.isArray(db.quotes) ? db.quotes : [];
         db.inquiries = Array.isArray(db.inquiries) ? db.inquiries : [];
+        // Внесената база може да е од постара верзија (пр. извоз од продукција пред
+        // новите параметри) — мигрирај ја веднаш, инаку измените во кодот се губат
+        // до следното рестартирање на серверот.
+        let migrated = false;
+        if ((Number(db.schemaVersion) || 0) < SCHEMA_VERSION) migrated = migrate(db, seed);
         saveDb();
-        return json(res, 200, { ok: true, materials: db.materials.length });
+        return json(res, 200, { ok: true, materials: db.materials.length, migrated, schemaVersion: db.schemaVersion });
       }
 
       // Колекции: PUT ја заменува целата колекција (админот уредува локално и зачувува)

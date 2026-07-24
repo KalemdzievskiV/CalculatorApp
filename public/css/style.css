@@ -129,6 +129,18 @@ table.data .cat-row td { background: var(--panel); font-family: var(--disp); fon
 .ci-group > h4 { font-family: var(--mono); font-size: 10.5px; letter-spacing: .14em; color: var(--ink-soft); margin: 0 0 10px; display: flex; align-items: center; gap: 10px; }
 .ci-group > h4::after { content: ''; flex: 1; height: 1px; background: var(--line); }
 .ci-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+/* Ексклузивен избор — визуелно е очигледно дека важи само една опција */
+.ci-exc { grid-column: span 2; }
+@media (max-width: 640px) { .ci-exc { grid-column: span 1; } }
+.ci-exc .seg { display: flex; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: #fff; }
+.ci-exc .seg-btn { flex: 1; padding: 8px 6px; font-family: var(--sans); font-size: 12px; line-height: 1.25; background: transparent; border: 0; border-right: 1px solid var(--line); cursor: pointer; color: var(--ink-soft); }
+.ci-exc .seg-btn:last-child { border-right: 0; }
+.ci-exc .seg-btn:hover { background: var(--panel); }
+.ci-exc .seg-btn.on { background: var(--accent); color: #fff; }
+.ci-exc .seg-none { flex: 0 0 54px; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; }
+/* Условено поле — важи само ако придружниот прекинувач е вклучен */
+.ci-gated.off { opacity: .45; }
+.ci-gated.off input { background: var(--panel); cursor: not-allowed; }
 .calc-sum .cs-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .calc-sum .cs-row b { font-family: var(--mono); font-weight: 500; white-space: nowrap; }
 .calc-sum .cs-row.big { font-size: 15px; }

@@ -96,6 +96,32 @@ Notes:
 - If you skip the volume, the site still works perfectly (calculator always loads correct
   seed pricing), but admin edits/quotes reset on each redeploy.
 
+## Getting the live database onto your machine
+
+The live data (prices, saved quotes, inquiries, analytics) lives in `db.json` on the
+Railway Volume. Two ways to pull a copy — **no Railway CLI needed**, both go through
+the admin API over HTTPS.
+
+**A. One command (recommended):**
+```bash
+cd app
+npm run pull-db -- https://your-app.up.railway.app 'YOUR_ADMIN_PASSWORD'
+node server.js          # now running locally on the live data
+```
+It backs up your existing `data/db.json` first (`data/db.backup-<timestamp>.json`,
+git-ignored) and **keeps your local admin password** — the export deliberately does
+not contain one.
+
+**B. No terminal:** log into the live `/admin.html` → **ПОДЕСУВАЊА** → *⬇ Симни
+резервна копија*. Then on your local admin → *⬆ Внеси резервна копија* and upload it.
+
+To push local data *up* to the live site, use the same *Внеси резервна копија* button
+on the **live** admin panel — it replaces the whole live database, so take a download
+first.
+
+> The dump contains real client data (names, emails, phones from inquiries and quotes).
+> Keep the file local; don't commit it — `data/db.json` and the backups are git-ignored.
+
 ## Other permanent hosts (data survives restarts)
 
 Any host with a **persistent volume** mounted at `/data` works with the same `Dockerfile`:

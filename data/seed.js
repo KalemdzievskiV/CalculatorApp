@@ -10,7 +10,17 @@ const settings = {
   phone: '071 336 108',
 };
 
-const inputGroups = ['ОСНОВНИ МЕРКИ', 'КОНСТРУКЦИЈА И СИСТЕМ', 'ФАСАДА', 'ВНАТРЕШНОСТ', 'ЕЛЕКТРИКА', 'КРОВ', 'ВРАТИ'];
+const inputGroups = ['ОСНОВНИ МЕРКИ', 'КОНСТРУКЦИЈА И СИСТЕМ', 'ФАСАДА', 'ВНАТРЕШНОСТ', 'ЕЛЕКТРИКА', 'КРОВ', 'ВРАТИ', 'ДОПОЛНИТЕЛНИ'];
+
+/*
+ * Дополнителни својства на влезните параметри (сите се опционални):
+ *   exclusive: 'ИМЕ'  — за прекинувачи: во иста група смее да е вклучен само еден.
+ *   gate: 'KLUC'      — полето важи само ако тој прекинувач е вклучен (инаку се чита како 0).
+ *   role: 'price'     — вредноста е цена во ДЕН (се користи преку priceFormula на ставката).
+ *   role: 'factor'    — вредноста е коефициент, стандардно 1 (пр. поскапување за боја).
+ *   target: 'windows' — коефициентот се множи во цената на сите редови од дограмата.
+ * Во priceFormula е достапна и променливата PRICE — основната цена на самата ставка.
+ */
 
 const inputs = [
   { key: 'AREA_HOUSE',    label: 'Површина на куќа', unit: 'm²', type: 'number', def: 166,   group: 'ОСНОВНИ МЕРКИ' },
@@ -22,35 +32,59 @@ const inputs = [
   { key: 'SIMS',          label: 'Симс околу објект', unit: 'm²', type: 'number', def: 11, group: 'ОСНОВНИ МЕРКИ' },
   { key: 'AREA',          label: 'Вкупна површина', unit: 'm²', type: 'derived', formula: 'AREA_HOUSE + AREA_TERRACE', group: 'ОСНОВНИ МЕРКИ' },
 
-  { key: 'KAMENA',        label: 'Камена волна конструкција', type: 'boolean', def: 1, group: 'КОНСТРУКЦИЈА И СИСТЕМ' },
-  { key: 'SIP',           label: 'СИП панел конструкција', type: 'boolean', def: 0, group: 'КОНСТРУКЦИЈА И СИСТЕМ' },
+  { key: 'KAMENA',        label: 'Камена волна конструкција', type: 'boolean', def: 1, group: 'КОНСТРУКЦИЈА И СИСТЕМ', exclusive: 'СИСТЕМ' },
+  { key: 'SIP',           label: 'СИП панел конструкција', type: 'boolean', def: 0, group: 'КОНСТРУКЦИЈА И СИСТЕМ', exclusive: 'СИСТЕМ' },
   { key: 'MONTAZA',       label: 'МДА монтажа', type: 'boolean', def: 1, group: 'КОНСТРУКЦИЈА И СИСТЕМ' },
   { key: 'KOSHULKA',      label: 'Кошулка', type: 'boolean', def: 0, group: 'КОНСТРУКЦИЈА И СИСТЕМ' },
+  { key: 'MEGUKATNA',     label: 'Меѓукатна конструкција', type: 'boolean', def: 0, group: 'КОНСТРУКЦИЈА И СИСТЕМ' },
+  { key: 'MEGUKATNA_M2',  label: 'Површина на меѓукатна', unit: 'm²', type: 'number', def: 0, group: 'КОНСТРУКЦИЈА И СИСТЕМ', gate: 'MEGUKATNA' },
 
   { key: 'ABRIB',         label: 'Фасада абриб', type: 'boolean', def: 1, group: 'ФАСАДА' },
   { key: 'FAS_LIM',       label: 'Фасаден лим', unit: 'm²', type: 'number', def: 0, group: 'ФАСАДА' },
   { key: 'FAS_LIM_LENTI', label: 'Фасаден лим ленти', unit: 'm¹', type: 'number', def: 0, group: 'ФАСАДА' },
   { key: 'FAS_PATOS',     label: 'Фасада патос', unit: 'm²', type: 'number', def: 0, group: 'ФАСАДА' },
   { key: 'OKAPNICI',      label: 'Фасада патос ленти окапници', unit: 'm¹', type: 'number', def: 0, group: 'ФАСАДА' },
+  { key: 'PREMIUM_FAS',   label: 'Премиум фасада', type: 'boolean', def: 0, group: 'ФАСАДА' },
+  { key: 'PREMIUM_FAS_M2', label: 'Количина премиум фасада', unit: 'm²', type: 'number', def: 0, group: 'ФАСАДА', gate: 'PREMIUM_FAS' },
 
   { key: 'GIPS',          label: 'Гипс картон внатре', type: 'boolean', def: 1, group: 'ВНАТРЕШНОСТ' },
   { key: 'CEILING',       label: 'Спуштен плафон', type: 'boolean', def: 1, group: 'ВНАТРЕШНОСТ' },
   { key: 'WC',            label: 'Број на WC', unit: 'ком', type: 'number', def: 4, group: 'ВНАТРЕШНОСТ' },
   { key: 'WC_PERIM',      label: 'Периметар WC', unit: 'm', type: 'number', def: 29, group: 'ВНАТРЕШНОСТ' },
-  { key: 'LAMINAT',       label: 'Под ламинат', type: 'boolean', def: 1, group: 'ВНАТРЕШНОСТ' },
-  { key: 'PLOCHKI',       label: 'Под плочки (внатре)', type: 'boolean', def: 0, group: 'ВНАТРЕШНОСТ' },
+  { key: 'WC_SANITARY',   label: 'WC со санитарии', unit: 'ком', type: 'number', def: 0, group: 'ВНАТРЕШНОСТ' },
+  { key: 'BEZ_GALANT',    label: 'Без галантерија (санитарии)', type: 'boolean', def: 0, group: 'ВНАТРЕШНОСТ' },
+  { key: 'LAMINAT',       label: 'Под ламинат', type: 'boolean', def: 1, group: 'ВНАТРЕШНОСТ', exclusive: 'ПОД' },
+  { key: 'PLOCHKI',       label: 'Под плочки (внатре)', type: 'boolean', def: 0, group: 'ВНАТРЕШНОСТ', exclusive: 'ПОД' },
   { key: 'TILE_EXTRA',    label: 'Додаток плочки надвор', unit: 'm²', type: 'number', def: 0, group: 'ВНАТРЕШНОСТ' },
 
   { key: 'ELEKTRIKA',     label: 'Електрика', type: 'boolean', def: 0, group: 'ЕЛЕКТРИКА' },
   { key: 'SHUKO',         label: 'Шуко приклучоци', unit: 'ком', type: 'number', def: 0, group: 'ЕЛЕКТРИКА' },
   { key: 'SVETLA',        label: 'Светла', unit: 'ком', type: 'number', def: 0, group: 'ЕЛЕКТРИКА' },
   { key: 'ORMAR',         label: 'Приклучен ормар', unit: 'ком', type: 'number', def: 0, group: 'ЕЛЕКТРИКА' },
+  { key: 'EL_BEZ_GALANT', label: 'Без галантерија (електрика)', type: 'boolean', def: 0, group: 'ЕЛЕКТРИКА' },
 
-  { key: 'ROOF_LIM',      label: 'Кров лим', type: 'boolean', def: 1, group: 'КРОВ' },
-  { key: 'ROOF_PUR',      label: 'Кров ПУР панел', type: 'boolean', def: 0, group: 'КРОВ' },
+  { key: 'ROOF_LIM',      label: 'Кров лим', type: 'boolean', def: 1, group: 'КРОВ', exclusive: 'КРОВ' },
+  { key: 'ROOF_PUR',      label: 'Кров ПУР панел', type: 'boolean', def: 0, group: 'КРОВ', exclusive: 'КРОВ' },
+  { key: 'FALCOVAN_LIM',  label: 'Фалцован лим', type: 'boolean', def: 0, group: 'КРОВ' },
+  { key: 'BOJA_LIM',      label: 'Боја на лим', type: 'number', def: 1, group: 'КРОВ', role: 'factor' },
+  { key: 'OLUCI_KRUZNI',  label: 'Олуци кружни', type: 'boolean', def: 0, group: 'КРОВ', exclusive: 'ОЛУЦИ' },
+  { key: 'OLUCI_PRAVO',   label: 'Олуци правоаголни', type: 'boolean', def: 0, group: 'КРОВ', exclusive: 'ОЛУЦИ' },
 
   { key: 'DOORS_IN',      label: 'Внатрешни врати', unit: 'ком', type: 'number', def: 8, group: 'ВРАТИ' },
   { key: 'DOORS_BLIND',   label: 'Блиндор врата', unit: 'ком', type: 'number', def: 0, group: 'ВРАТИ' },
+  { key: 'BOJA_VRATI',    label: 'Боја на врати', type: 'number', def: 1, group: 'ВРАТИ', role: 'factor' },
+  { key: 'BOJA_PROZ_NADV', label: 'Боја на прозори надвор', type: 'number', def: 1, group: 'ВРАТИ', role: 'factor', target: 'windows' },
+  { key: 'BOJA_PROZ_VNAT', label: 'Боја на прозори внатре', type: 'number', def: 1, group: 'ВРАТИ', role: 'factor', target: 'windows' },
+
+  { key: 'SKELE',         label: 'Скеле за работа', type: 'boolean', def: 0, group: 'ДОПОЛНИТЕЛНИ' },
+  { key: 'KRAN',          label: 'Кран', type: 'boolean', def: 0, group: 'ДОПОЛНИТЕЛНИ' },
+  { key: 'METALNA',       label: 'Метална конструкција', type: 'boolean', def: 0, group: 'ДОПОЛНИТЕЛНИ' },
+  { key: 'METALNA_CENA',  label: 'Цена метална конструкција', unit: 'ден', type: 'number', def: 192715, group: 'ДОПОЛНИТЕЛНИ', gate: 'METALNA', role: 'price' },
+  { key: 'SKALI',         label: 'Скали внатрешни', type: 'boolean', def: 0, group: 'ДОПОЛНИТЕЛНИ' },
+  { key: 'SKALI_CENA',    label: 'Цена скали (по m¹)', unit: 'ден', type: 'number', def: 2000, group: 'ДОПОЛНИТЕЛНИ', gate: 'SKALI', role: 'price' },
+  { key: 'SKALI_M',       label: 'Должина скали', unit: 'm¹', type: 'number', def: 0, group: 'ДОПОЛНИТЕЛНИ', gate: 'SKALI' },
+  { key: 'OSB_POD',       label: 'ОСБ 18мм под', unit: 'm²', type: 'number', def: 0, group: 'ДОПОЛНИТЕЛНИ' },
+  { key: 'GARAZA_PLOCHKI', label: 'Плочки под гаража', unit: 'm²', type: 'number', def: 0, group: 'ДОПОЛНИТЕЛНИ' },
 ];
 
 const categories = [
@@ -125,7 +159,7 @@ const materials = [
   m('F15', 'FASADA', 'МИНЕРАЛ АБРИБ ФАСАДА', 'м2', 380, 'qty("F13")', { grey: 1 }),
   m('F16', 'FASADA', 'РАБОТНА АБРИБ ФАСАДА', 'м2', 730, 'qty("F13")', { grey: 1 }),
   m('F17', 'FASADA', 'РАБОТНА РАКА ПАТОС', 'м2', 950, 'FAS_PATOS'),
-  m('F18', 'FASADA', 'ПРЕМИУМ ФАСАДА', 'м2', 3238, 0),
+  m('F18', 'FASADA', 'ПРЕМИУМ ФАСАДА', 'м2', 3238, 'PREMIUM_FAS_M2'),
 
   // ─── ИЗОЛАЦИЈА ───
   m('I01', 'IZOLACIJA', 'ТЕРВОЛ 5СМ', 'м2', 75, '(((WALL_OUT+WALL_IN)*FLOOR_H)+ROOF)*KAMENA'),
@@ -167,12 +201,14 @@ const materials = [
   // ─── ВОДОВОД ───
   m('V01', 'VODOVOD', 'ВОДОВОДНИ ЦЕВКИ', 'кол', 20000, 'WC'),
   m('V02', 'VODOVOD', 'РАБОТНА ВОДОВОД', 'кол', 21250, 'WC'),
-  m('V03', 'VODOVOD', 'МОНОБЛОК ШКОЛКА', 'кол', 7500, 3),
-  m('V04', 'VODOVOD', 'МИЈАЛНИК', 'кол', 3500, 3),
-  m('V05', 'VODOVOD', 'ЧЕШМА МИЈАЛНИК', 'кол', 3500, 3),
-  m('V06', 'VODOVOD', 'ЧЕШМА ТУШ', 'кол', 3500, 3),
-  m('V07', 'VODOVOD', 'ЕК ВЕНТИЛ', 'кол', 250, 18),
-  m('V08', 'VODOVOD', 'ПАНЦИР ЦРЕВА', 'кол', 250, 18),
+  // Санитариите се врзани за „WC со санитарии"; „без галантерија" ги исклучува.
+  // Претходно беа фиксни (3/3/3/3/18/18) и се наплаќаа на секоја понуда.
+  m('V03', 'VODOVOD', 'МОНОБЛОК ШКОЛКА', 'кол', 7500, 'WC_SANITARY * (1 - BEZ_GALANT)'),
+  m('V04', 'VODOVOD', 'МИЈАЛНИК', 'кол', 3500, 'WC_SANITARY * (1 - BEZ_GALANT)'),
+  m('V05', 'VODOVOD', 'ЧЕШМА МИЈАЛНИК', 'кол', 3500, 'WC_SANITARY * (1 - BEZ_GALANT)'),
+  m('V06', 'VODOVOD', 'ЧЕШМА ТУШ', 'кол', 3500, 'WC_SANITARY * (1 - BEZ_GALANT)'),
+  m('V07', 'VODOVOD', 'ЕК ВЕНТИЛ', 'кол', 250, 'WC_SANITARY * 6 * (1 - BEZ_GALANT)'),
+  m('V08', 'VODOVOD', 'ПАНЦИР ЦРЕВА', 'кол', 250, 'WC_SANITARY * 6 * (1 - BEZ_GALANT)'),
 
   // ─── ЕЛЕКТРИКА (материјали) ───
   m('E01', 'ELEKTRIKA', 'РАЗВОДНА ТАБЛА 18', 'кол', 1808, '(AREA/100)*ELEKTRIKA'),
@@ -206,19 +242,21 @@ const materials = [
   m('E29', 'ELEKTRIKA', 'ПОДЛОШКА 3М', 'кол', 33, 'qty("E25")'),
   m('E30', 'ELEKTRIKA', 'ПОДЛОШКА 4М', 'кол', 39, 'qty("E26")'),
   m('E31', 'ELEKTRIKA', 'ПОДЛОШКА 7М', 'кол', 54, 'qty("E27")'),
+  // Видлива галантерија (маски, шуко, прекинувачи, капачиња) — се исклучува со EL_BEZ_GALANT.
+  // Монтажните ставки EM13/EM14 автоматски паѓаат на 0 бидејќи зависат од овие количини.
   m('E32', 'ELEKTRIKA', 'МАСКА 1М', 'кол', 32, 0),
-  m('E33', 'ELEKTRIKA', 'МАСКА 2М', 'кол', 32, 'qty("E24")'),
-  m('E34', 'ELEKTRIKA', 'МАСКА 3М', 'кол', 42, 'qty("E25")'),
-  m('E35', 'ELEKTRIKA', 'МАСКА 4М', 'кол', 52, 'qty("E26")'),
-  m('E36', 'ELEKTRIKA', 'МАСКА 7М', 'кол', 72, 'qty("E27")'),
-  m('E37', 'ELEKTRIKA', 'ШУКО 1М', 'кол', 65, '(AREA/25)*ELEKTRIKA'),
-  m('E38', 'ELEKTRIKA', 'ШУКО 2М', 'кол', 128, 'SHUKO - qty("E37")'),
-  m('E39', 'ELEKTRIKA', 'ШУКО 2М СО КАПАК', 'кол', 162, 'qty("E43")'),
-  m('E40', 'ELEKTRIKA', 'ПРЕКИНУВАЧ 1М', 'кол', 68, 'qty("E58")+qty("E57")'),
-  m('E41', 'ELEKTRIKA', 'ПРЕКИНУВАЧ НАИЗ. 1М', 'кол', 99, '(AREA/30)*ELEKTRIKA'),
-  m('E42', 'ELEKTRIKA', 'СЛЕПО КАПАЧЕ', 'кол', 22, '(AREA/5)*ELEKTRIKA'),
+  m('E33', 'ELEKTRIKA', 'МАСКА 2М', 'кол', 32, 'qty("E24") * (1 - EL_BEZ_GALANT)'),
+  m('E34', 'ELEKTRIKA', 'МАСКА 3М', 'кол', 42, 'qty("E25") * (1 - EL_BEZ_GALANT)'),
+  m('E35', 'ELEKTRIKA', 'МАСКА 4М', 'кол', 52, 'qty("E26") * (1 - EL_BEZ_GALANT)'),
+  m('E36', 'ELEKTRIKA', 'МАСКА 7М', 'кол', 72, 'qty("E27") * (1 - EL_BEZ_GALANT)'),
+  m('E37', 'ELEKTRIKA', 'ШУКО 1М', 'кол', 65, '(AREA/25)*ELEKTRIKA * (1 - EL_BEZ_GALANT)'),
+  m('E38', 'ELEKTRIKA', 'ШУКО 2М', 'кол', 128, '(SHUKO - qty("E37")) * (1 - EL_BEZ_GALANT)'),
+  m('E39', 'ELEKTRIKA', 'ШУКО 2М СО КАПАК', 'кол', 162, 'qty("E43") * (1 - EL_BEZ_GALANT)'),
+  m('E40', 'ELEKTRIKA', 'ПРЕКИНУВАЧ 1М', 'кол', 68, '(qty("E58")+qty("E57")) * (1 - EL_BEZ_GALANT)'),
+  m('E41', 'ELEKTRIKA', 'ПРЕКИНУВАЧ НАИЗ. 1М', 'кол', 99, '(AREA/30)*ELEKTRIKA * (1 - EL_BEZ_GALANT)'),
+  m('E42', 'ELEKTRIKA', 'СЛЕПО КАПАЧЕ', 'кол', 22, '(AREA/5)*ELEKTRIKA * (1 - EL_BEZ_GALANT)'),
   m('E43', 'ELEKTRIKA', 'ИНДИКАТОР', 'кол', 169, 'qty("V01")'),
-  m('E44', 'ELEKTRIKA', 'LAN ШУКО', 'кол', 368, 'qty("E23")/250'),
+  m('E44', 'ELEKTRIKA', 'LAN ШУКО', 'кол', 368, 'qty("E23")/250 * (1 - EL_BEZ_GALANT)'),
   m('E45', 'ELEKTRIKA', 'ТВ ШУКО', 'кол', 158, 'qty("E44")'),
   m('E46', 'ELEKTRIKA', 'ПЕРФОРИРАНА ТРАКА', 'кол', 200, 'qty("E01")*5'),
   m('E47', 'ELEKTRIKA', 'ОГ ДОЗНА 80Х80', 'кол', 62.5, '(AREA/10)*ELEKTRIKA'),
@@ -261,7 +299,7 @@ const materials = [
 
   // ─── ПОДОПОЛАГАЊЕ ───
   m('PD01', 'PODOVI', 'КОШУЛКА', 'м2', 950, 'AREA*KOSHULKA'),
-  m('PD02', 'PODOVI', 'ОСБ 18мм', 'м2', 550, 90, { grey: 1 }),
+  m('PD02', 'PODOVI', 'ОСБ 18мм', 'м2', 550, 'OSB_POD', { grey: 1 }),
   m('PD03', 'PODOVI', 'ПЛОЧКИ ЅИД ВЦ', 'м2', 650, 'WC_PERIM*2'),
   m('PD04', 'PODOVI', 'ПЛОЧКИ ПОД ВЦ', 'м2', 650, '((WC_PERIM/7)+2)*WC'),
   m('PD05', 'PODOVI', 'ЛЕПАК ЦЕРЕСИТ 11', 'кг', 510, 0),
@@ -273,7 +311,7 @@ const materials = [
   m('PD11', 'PODOVI', 'СИФОН ТУШ КАБИНА', 'кол', 250, 'WC'),
   m('PD14', 'PODOVI', 'РАБОТНА ПЛОЧКИ', 'м2', 1050, 'qty("PD03")+qty("PD04")+qty("PD15")+qty("PD16")+qty("PD17")+qty("PD18")'),
   m('PD15', 'PODOVI', 'ПЛОЧКИ ЅИД КУЈНА', 'м2', 930, '(AREA_HOUSE/35)*WC'),
-  m('PD16', 'PODOVI', 'ПЛОЧКИ ПОД ГАРАЖА', 'м2', 930, 18),
+  m('PD16', 'PODOVI', 'ПЛОЧКИ ПОД ГАРАЖА', 'м2', 930, 'GARAZA_PLOCHKI'),
   m('PD17', 'PODOVI', 'ПОД ПЛОЧКИ КУЌА ВНАТРЕ', 'м2', 650, '(AREA_HOUSE-qty("PD04"))*PLOCHKI'),
   m('PD18', 'PODOVI', 'ПОД ПЛОЧКИ КУЌА НАДВОР', 'м2', 700, 'TILE_EXTRA+AREA_TERRACE'),
   m('PD19', 'PODOVI', 'ПОД ЛАМИНАТ КУЌА', 'м2', 850, '(AREA_HOUSE-qty("PD04")-qty("PD17")-qty("PD16")+10)*LAMINAT'),
@@ -281,15 +319,15 @@ const materials = [
   m('PD21', 'PODOVI', 'РАБОТНА ПОД КУЌА', 'пауш', 400, 'qty("PD19")+qty("PD20")'),
 
   // ─── ДОГРАМА (прозорите се внесуваат динамички во калкулаторот) ───
-  m('D01', 'DOGRAMA', 'ВНАТРЕШНА ВРАТА', 'кол', 12800, 'DOORS_IN', { grey: 1 }),
-  m('D02', 'DOGRAMA', 'НАДВОРЕШНА ВРАТА БЛИНДОР', 'кол', 40000, 'DOORS_BLIND', { grey: 1 }),
+  m('D01', 'DOGRAMA', 'ВНАТРЕШНА ВРАТА', 'кол', 12800, 'DOORS_IN', { grey: 1, priceFormula: 'PRICE * BOJA_VRATI' }),
+  m('D02', 'DOGRAMA', 'НАДВОРЕШНА ВРАТА БЛИНДОР', 'кол', 40000, 'DOORS_BLIND', { grey: 1, priceFormula: 'PRICE * BOJA_VRATI' }),
   m('D03', 'DOGRAMA', 'МОНТАЖА ДОГРАМА', 'пауш', 2000, 'WINDOWS_QTY + (DOORS_IN*2) + (DOORS_BLIND*3)', { grey: 1 }),
 
   // ─── КРОВОПОКРИВАЊЕ ───
   m('R01', 'POKRIVANJE', 'ПУР ПАНЕЛ ЛИМ 10СМ', 'м2', 1000, '(ROOF+25)*ROOF_PUR'),
   m('R02', 'POKRIVANJE', 'РАБОТНА ПУР ПАНЕЛ', 'м2', 750, 'qty("R01")'),
-  m('R03', 'POKRIVANJE', 'ЛИМ ПОКРИВЕН', 'м2', 1450, 'ROOF*ROOF_LIM', { grey: 1 }),
-  m('R04', 'POKRIVANJE', 'ЛИМ ЅИДЕН', 'м2', 1225, 0),
+  m('R03', 'POKRIVANJE', 'ЛИМ ПОКРИВЕН', 'м2', 1450, 'ROOF*ROOF_LIM', { grey: 1, priceFormula: 'PRICE * BOJA_LIM' }),
+  m('R04', 'POKRIVANJE', 'ЛИМ ЅИДЕН', 'м2', 1225, 0, { priceFormula: 'PRICE * BOJA_LIM' }),
   m('R05', 'POKRIVANJE', 'ВЕТЕРЛАЈСНИ', 'м1', 980, '((WALL_OUT+10)+(AREA/10))*ROOF_LIM', { grey: 1 }),
   m('R06', 'POKRIVANJE', 'ВЕРТИКАЛНИ ОЛУЦИ', 'м1', 980, '(FLOOR_H*9)*ROOF_LIM', { grey: 1 }),
   m('R07', 'POKRIVANJE', 'ХОРИЗОНТАЛНИ ОЛУЦИ', 'м1', 980, '(WALL_OUT/2.3)*ROOF_LIM', { grey: 1 }),
@@ -304,15 +342,16 @@ const materials = [
   m('L05', 'RABOTNA', 'СМЕСТУВАЊЕ', 'пауш', 900, 0),
   m('L06', 'RABOTNA', 'ХРАНА', 'пауш', 750, 0),
   m('L07', 'RABOTNA', 'РАБОТИЛНИЦА', 'пауш', 1800, '(AREA/3)*MONTAZA', { grey: 1 }),
-  m('L08', 'RABOTNA', 'КРАН', 'пауш', 2000, 0),
+  m('L08', 'RABOTNA', 'КРАН', 'пауш', 2000, 'KRAN'),
   m('L09', 'RABOTNA', 'РАБОТНА РАБОТИЛНИЦА', 'пауш', 750, '(AREA*1.5)*MONTAZA', { grey: 0.5 }),
-  m('L10', 'RABOTNA', 'СКЕЛЕ ЗА РАБОТА', 'пауш', 120000, 1),
+  m('L10', 'RABOTNA', 'СКЕЛЕ ЗА РАБОТА', 'пауш', 120000, 'SKELE'),
   m('L11', 'RABOTNA', 'РАБОТНА МОДУЛАР ТЕРАСА', 'пауш', 4000, 'AREA_TERRACE*MONTAZA', { grey: 1 }),
   m('L12', 'RABOTNA', 'РАБОТНА МОДУЛАР', 'пауш', 8000, 'AREA_HOUSE*MONTAZA', { grey: 0.5 }),
 
   // ─── ДОПОЛНИТЕЛНИ ───
-  m('X01', 'DOPOLNITELNI', 'МЕТАЛНА КОНСТРУКЦИЈА', 'пауш', 192715, 1),
-  m('X02', 'DOPOLNITELNI', 'ИЗРАБОТКА НА СКАЛИ', 'м1', 2000, 0),
+  // Цената доаѓа од калкулаторот (METALNA_CENA / SKALI_CENA) — по проект, не глобално.
+  m('X01', 'DOPOLNITELNI', 'МЕТАЛНА КОНСТРУКЦИЈА', 'пауш', 192715, 'METALNA', { priceFormula: 'METALNA_CENA' }),
+  m('X02', 'DOPOLNITELNI', 'ИЗРАБОТКА НА СКАЛИ', 'м1', 2000, 'SKALI_M', { priceFormula: 'SKALI_CENA' }),
   m('X03', 'DOPOLNITELNI', 'ОГРАДИ НА ТЕРАСИ ОБИЧНИ', 'пауш', 8500, 0),
   m('X04', 'DOPOLNITELNI', 'ДРВЕНА КОНСТРУКЦИЈА', 'пауш', 24500, 0),
   m('X05', 'DOPOLNITELNI', 'ДРВЕНА РАБОТНА', 'пауш', 35000, 0),

@@ -139,7 +139,8 @@
   document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => $('#matModal').classList.remove('open'); });
 
   function knownVarsAndCodes() {
-    const vars = cfg.inputs.map((x) => x.key).concat(['WINDOWS_QTY']);
+    // PRICE е достапна само во priceFormula (основната цена на самата ставка)
+    const vars = cfg.inputs.map((x) => x.key).concat(['WINDOWS_QTY', 'PRICE']);
     const codes = cfg.materials.map((x) => x.code);
     return { vars, codes };
   }
@@ -256,7 +257,10 @@
       <td class="mono">${esc(inp.key)}</td>
       <td>${esc(inp.label)}</td>
       <td class="muted" style="font-size:11.5px;">${esc(inp.group || '')}</td>
-      <td><span class="tag">${inp.type === 'boolean' ? 'да/не' : inp.type === 'derived' ? 'изведен' : 'број'}</span></td>
+      <td><span class="tag">${inp.type === 'boolean' ? 'да/не' : inp.type === 'derived' ? 'изведен' : inp.role === 'factor' ? 'коефициент' : inp.role === 'price' ? 'цена' : 'број'}</span>${
+        inp.exclusive ? `<span class="tag" title="Само еден од групата може да е вклучен">⇄ ${esc(inp.exclusive)}</span>` : ''}${
+        inp.gate ? `<span class="tag" title="Важи само ако ${esc(inp.gate)} е вклучен">⛓ ${esc(inp.gate)}</span>` : ''}${
+        inp.target === 'windows' ? '<span class="tag" title="Се множи во цената на дограмата">дограма</span>' : ''}</td>
       <td class="num">${inp.type === 'derived' ? '<span class="mono" style="font-size:11px;">' + esc(inp.formula) + '</span>' : `<input type="number" step="any" value="${inp.def}" style="width:90px;text-align:right;font-family:var(--mono);font-size:12.5px;padding:4px 6px;border:1px solid var(--line);border-radius:2px;">`}</td>
       <td class="muted">${esc(inp.unit || '')}</td>
       <td>${inp.type !== 'derived' ? '<button class="icon-btn del" title="Избриши">🗑</button>' : ''}</td>
@@ -285,7 +289,26 @@
     const type = confirm('Да/не прекинувач? (Откажи = броен параметар)') ? 'boolean' : 'number';
     const group = prompt('Група:\n' + cfg.inputGroups.join(', '), cfg.inputGroups[0]) || cfg.inputGroups[0];
     if (!cfg.inputGroups.includes(group)) { cfg.inputGroups.push(group); await save('inputGroups'); }
-    cfg.inputs.push({ key, label, group, type, def: 0, unit: '' });
+    const inp = { key, label, group, type, def: 0, unit: '' };
+
+    if (type === 'boolean') {
+      // Ексклузивна група — спречува два меѓусебно исклучиви избора да бидат вклучени заедно
+      const exc = (prompt('Ексклузивна група (празно = без):\nПостоечки: ' +
+        [...new Set(cfg.inputs.map((i) => i.exclusive).filter(Boolean))].join(', ')) || '').trim();
+      if (exc) inp.exclusive = exc;
+    } else {
+      const gate = (prompt('Важи само ако овој прекинувач е вклучен (клуч, празно = секогаш):') || '').trim().toUpperCase();
+      if (gate) {
+        const g = cfg.inputs.find((i) => i.key === gate);
+        if (!g || g.type !== 'boolean') return alert('Нема прекинувач со клуч ' + gate);
+        inp.gate = gate;
+      }
+      const role = (prompt('Улога — остави празно за обичен број, "price" за цена во ден, "factor" за коефициент:') || '').trim();
+      if (role === 'price' || role === 'factor') inp.role = role;
+      if (role === 'factor') inp.def = 1;
+    }
+
+    cfg.inputs.push(inp);
     await save('inputs');
     renderInputs();
   };
@@ -701,20 +724,52 @@
       ? `<div class="error-note">Грешки во формулите: ${r.errors.map(esc).join('; ')}</div>` : '';
   }
 
+  // Полето е активно ако нема услов, или ако придружниот прекинувач е вклучен.
+  const gateOpen = (inp) => !inp.gate || !!calc.inputs[inp.gate];
+
   function renderCalcInputs() {
     const host = $('#cInputs');
     host.innerHTML = cfg.inputGroups.map((g) => {
       const fields = cfg.inputs.filter((i) => i.group === g && i.type !== 'derived');
       if (!fields.length) return '';
+      const done = new Set();
       return `<div class="ci-group"><h4>${esc(g)}</h4><div class="ci-grid">` + fields.map((inp) => {
+        if (done.has(inp.key)) return '';
+
+        // Ексклузивна група → еден избирач наместо повеќе независни прекинувачи,
+        // за да не може двата система да бидат вклучени истовремено.
+        if (inp.type === 'boolean' && inp.exclusive) {
+          const opts = fields.filter((f) => f.exclusive === inp.exclusive);
+          opts.forEach((o) => done.add(o.key));
+          return `<div class="field ci-exc" data-exc="${esc(inp.exclusive)}">
+            <label>${esc(inp.exclusive)}</label>
+            <div class="seg">${opts.map((o) => `<button type="button" class="seg-btn${calc.inputs[o.key] ? ' on' : ''}" data-key="${o.key}">${esc(o.label)}</button>`).join('')}
+              <button type="button" class="seg-btn seg-none${opts.some((o) => calc.inputs[o.key]) ? '' : ' on'}" data-key="">нема</button></div>
+          </div>`;
+        }
+
         if (inp.type === 'boolean') {
           return `<label class="toggle${calc.inputs[inp.key] ? ' on' : ''}" data-key="${inp.key}">
             <span class="t-label">${esc(inp.label)}</span><span class="knob"></span></label>`;
         }
-        return `<div class="field"><label>${esc(inp.label)}${inp.unit ? `<span class="unit">${esc(inp.unit)}</span>` : ''}</label>
-          <input type="number" step="any" data-key="${inp.key}" value="${calc.inputs[inp.key]}"></div>`;
+
+        const open = gateOpen(inp);
+        const unit = inp.role === 'factor' ? '×' : (inp.unit || '');
+        return `<div class="field${inp.gate ? ' ci-gated' : ''}${open ? '' : ' off'}" data-gated-by="${esc(inp.gate || '')}">
+          <label>${esc(inp.label)}${unit ? `<span class="unit">${esc(unit)}</span>` : ''}</label>
+          <input type="number" step="any" data-key="${inp.key}" value="${calc.inputs[inp.key]}"${open ? '' : ' disabled'}></div>`;
       }).join('') + '</div></div>';
     }).join('');
+
+    // Ги вклучува/исклучува условените полиња без повторно исцртување (курсорот останува во полето)
+    const refreshGates = () => {
+      host.querySelectorAll('.ci-gated').forEach((el) => {
+        const open = !!calc.inputs[el.dataset.gatedBy];
+        el.classList.toggle('off', !open);
+        el.querySelector('input').disabled = !open;
+      });
+    };
+
     host.querySelectorAll('input[data-key]').forEach((el) => {
       el.oninput = () => { calc.inputs[el.dataset.key] = parseFloat(el.value) || 0; recalcAdmin(); };
     });
@@ -723,8 +778,21 @@
         const k = el.dataset.key;
         calc.inputs[k] = calc.inputs[k] ? 0 : 1;
         el.classList.toggle('on', !!calc.inputs[k]);
+        refreshGates();
         recalcAdmin();
       };
+    });
+    host.querySelectorAll('.ci-exc').forEach((box) => {
+      const btns = box.querySelectorAll('.seg-btn');
+      btns.forEach((b) => {
+        b.onclick = () => {
+          btns.forEach((x) => { if (x.dataset.key) calc.inputs[x.dataset.key] = 0; x.classList.remove('on'); });
+          if (b.dataset.key) calc.inputs[b.dataset.key] = 1;
+          b.classList.add('on');
+          refreshGates();
+          recalcAdmin();
+        };
+      });
     });
   }
 
