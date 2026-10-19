@@ -887,6 +887,7 @@
     calc.discountEur = 0;
     calc.terraceType = 'open';
     calc.terraceType2 = 'covered';
+    calc.plan = null;
     syncTerrace();
     calc.outerH = 4.6;
   }
@@ -1183,6 +1184,7 @@
     renderCalcInputs();
     renderCalcWindows();
     recalcAdmin();
+    planBtn();
   }
 
   // Вчитува зачувана понуда во калкулаторот (полн приказ + печатење)
@@ -1198,6 +1200,7 @@
     calc.date = qt.createdAt ? new Date(qt.createdAt).toLocaleDateString('mk-MK') : today();
     calc.terraceType = 'open';
     calc.terraceType2 = 'covered';
+    calc.plan = qt.plan || null;
     sumFloors();
     syncTerrace();
     calc.outerH = 4.6;
@@ -1208,10 +1211,30 @@
     renderCalcWindows();
     recalcAdmin();
     $('#cNote').style.color = 'var(--ink-soft)';
+    planBtn();
     $('#cNote').textContent = 'Вчитана зачувана понуда од ' + calc.date + (calc.client ? ' · ' + calc.client : '');
   }
 
-  $('#cReset').onclick = () => { calcDefaults(); calc.date = today(); syncCalcFields(); renderCalcInputs(); renderCalcWindows(); recalcAdmin(); };
+  // План на куќа: цртежот ги пополнува мерките (ѕидови, површина, врати, WC, под)
+  const planBtn = () => { $('#cPlan').textContent = calc.plan && calc.plan.floors.some((f) => f.walls.length) ? '✏ Уреди план' : '✏ Нацртај план'; };
+  $('#cPlan').onclick = () => {
+    const labels = {};
+    cfg.inputs.forEach((i) => { labels[i.key] = i.label; });
+    MDAPlanner.open(calc.plan, { floors: twoFloors() ? 2 : 1, labels }, (patch, plan) => {
+      calc.plan = plan;
+      const done = [];
+      for (const [k, v] of Object.entries(patch)) if (inpOf(k)) { calc.inputs[k] = v; done.push(labels[k] || k); }
+      sumFloors();
+      syncTerrace();
+      renderCalcInputs();
+      recalcAdmin();
+      planBtn();
+      $('#cNote').style.color = 'var(--ink-soft)';
+      $('#cNote').textContent = done.length ? 'Од планот: ' + done.join(', ') : 'Планот е зачуван (нема мерки за пополнување).';
+    });
+  };
+
+  $('#cReset').onclick = () => { calcDefaults(); calc.date = today(); syncCalcFields(); renderCalcInputs(); renderCalcWindows(); recalcAdmin(); planBtn(); };
   $('#cAddWin').onclick = () => { calc.windows.push({ name: '', qty: 1, priceEur: 0 }); renderCalcWindows(); recalcAdmin(); };
   $('#cClient').oninput = (e) => { calc.client = e.target.value; };
   $('#cDate').oninput = (e) => { calc.date = e.target.value; };
@@ -1223,7 +1246,7 @@
   $('#cSaveQuote').onclick = async () => {
     const r = await fetch('/api/quotes', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client: calc.client.trim() || 'Без име', inputs: calc.inputs, windows: calc.windows, discountEur: calc.discountEur, totalEur: calcRes.totalEur }),
+      body: JSON.stringify({ client: calc.client.trim() || 'Без име', inputs: calc.inputs, windows: calc.windows, discountEur: calc.discountEur, totalEur: calcRes.totalEur, plan: calc.plan }),
     }).then((x) => x.json());
     $('#cNote').innerHTML = 'Зачувано ✓ <a href="index.html?quote=' + r.id + '" target="_blank">линк</a>';
   };

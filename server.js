@@ -237,6 +237,8 @@ const server = http.createServer(async (req, res) => {
         discountEur: Number(body.discountEur) || 0,
         totalEur: Number(body.totalEur) || 0,
       };
+      // Цртеж на основата (админ калкулатор) — се чува за подоцнежно уредување
+      if (body.plan && typeof body.plan === 'object' && Array.isArray(body.plan.floors) && JSON.stringify(body.plan).length < 300000) quote.plan = body.plan;
       db.quotes = db.quotes || [];
       db.quotes.unshift(quote);
       saveDb();

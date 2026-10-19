@@ -575,3 +575,54 @@ body.notice-closed .nav-hero { top: 0; }
   .lang-mobile { display: flex; gap: 8px; padding: 12px 0 4px; }
   .lang-mobile a { width: auto !important; border: 1px solid var(--line) !important; border-radius: 2px; padding: 6px 14px !important; font-family: var(--mono); font-size: 12px; }
 }
+
+/* ═══ План на куќа (цртач) ═══ */
+.pl-back { padding: 2vh 12px; }
+.pl-modal { max-width: 1280px; display: flex; flex-direction: column; height: 94vh; }
+.pl-modal .modal-head { gap: 14px; }
+.pl-floors { flex: 1; display: flex; }
+.pl-seg { display: flex; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: #fff; }
+.pl-seg .seg-btn { padding: 7px 14px; font-family: var(--sans); font-size: 12px; background: transparent; border: 0; border-right: 1px solid var(--line); cursor: pointer; color: var(--ink-soft); }
+.pl-seg .seg-btn:last-child { border-right: 0; }
+.pl-seg .seg-btn.on { background: var(--accent); color: #fff; }
+.pl-main { flex: 1; min-height: 0; display: grid; grid-template-columns: 168px 1fr 270px; }
+.pl-tools { border-right: 1px solid var(--line); padding: 12px 10px; display: flex; flex-direction: column; gap: 4px; overflow-y: auto; }
+.pl-tool { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; padding: 8px 10px; font-family: var(--sans); font-size: 12.5px; color: var(--ink); background: transparent; border: 1px solid transparent; border-radius: 2px; cursor: pointer; }
+.pl-tool:hover { background: var(--panel); }
+.pl-tool.on { background: #fff; border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.pl-tool i { flex: none; width: 16px; height: 12px; border-radius: 1px; }
+.pl-t-select i { border: 1.5px solid currentColor; border-radius: 50%; width: 12px; }
+.pl-t-out i { background: #3b3732; height: 6px; }
+.pl-t-in i { background: #8d867c; height: 4px; }
+.pl-t-door i { border: 1.5px solid currentColor; border-left: 0; border-bottom: 0; border-radius: 0 12px 0 0; }
+.pl-t-laminat i { background: rgba(196,154,98,.45); border: 1px dashed #b4874c; }
+.pl-t-plochki i { background: rgba(110,140,165,.4); border: 1px dashed #62839b; }
+.pl-t-wc i { background: rgba(70,150,195,.45); border: 1px solid #3a88b3; }
+.pl-sep { height: 1px; background: var(--line); margin: 8px 0; }
+.pl-canvas { position: relative; min-width: 0; background: #fff; }
+.pl-canvas svg { display: block; width: 100%; height: 100%; touch-action: none; user-select: none; }
+.pl-typed { position: absolute; left: 12px; top: 12px; font-family: var(--mono); font-size: 13px; background: var(--accent); color: #fff; padding: 4px 8px; border-radius: 2px; }
+.pl-typed:empty { display: none; }
+.pl-side { border-left: 1px solid var(--line); padding: 12px; overflow-y: auto; display: grid; gap: 12px; align-content: start; }
+.pl-box { border: 1px solid var(--line); background: #fff; border-radius: 2px; padding: 10px 12px; display: grid; gap: 9px; }
+.pl-box h5 { margin: 0; font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-soft); }
+.pl-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; }
+.pl-row span { color: var(--ink-soft); }
+.pl-row b { font-family: var(--mono); font-weight: 600; white-space: nowrap; }
+.pl-warn { color: var(--accent); font-family: var(--sans); font-weight: 600; }
+.pl-hint { flex: 1; margin-right: 10px; }
+.pl-dim { font-family: var(--mono); font-size: 11px; fill: var(--ink-soft); paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; }
+.pl-dim.strong { fill: var(--accent); font-weight: 700; font-size: 12px; }
+.pl-zlabel { font-family: var(--sans); font-size: 11px; fill: var(--ink-soft); pointer-events: none; }
+.pl-handle { fill: #fff; stroke: var(--accent); stroke-width: 2; }
+@media (max-width: 900px) {
+  .pl-modal { height: auto; }
+  .pl-main { grid-template-columns: 1fr; }
+  .pl-tools { flex-direction: row; flex-wrap: wrap; border-right: 0; border-bottom: 1px solid var(--line); }
+  .pl-tool { width: auto; }
+  .pl-sep { display: none; }
+  .pl-canvas { height: 60vh; }
+  .pl-side { border-left: 0; border-top: 1px solid var(--line); }
+  .pl-modal .modal-foot { flex-wrap: wrap; }
+  .pl-hint { flex-basis: 100%; }
+}
