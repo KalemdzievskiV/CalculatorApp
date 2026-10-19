@@ -25,6 +25,8 @@
   .login-card { width: 340px; }
   .formula-input { font-family: var(--mono) !important; font-size: 12.5px !important; }
   .hint { font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+  .tab-hint { margin: -4px 0 12px; }
+  .data tr.no-match { display: none; }
   .hint code { background: var(--panel); padding: 1px 5px; border-radius: 2px; font-size: 11px; }
   td .icon-btn { background: none; border: none; cursor: pointer; font-size: 15px; padding: 2px 6px; color: var(--ink-soft); }
   td .icon-btn:hover { color: var(--accent); }
@@ -95,10 +97,17 @@
     <!-- КАТЕГОРИИ -->
     <div class="tab-panel" id="tab-categories">
       <div class="toolbar">
-        <span class="hint">Категориите го групираат ценовникот и рекапитуларот. Бришењето е можно само ако нема материјали во категоријата.</span>
+        <input type="text" id="catSearch" placeholder="Барај категорија…" style="width: 240px;">
+        <select id="catFilter">
+          <option value="">Сите категории</option>
+          <option value="used">Со материјали</option>
+          <option value="empty">Празни (без материјали)</option>
+        </select>
+        <span class="hint" id="catCount"></span>
         <span style="flex: 1;"></span>
         <button class="btn accent small" id="addCat">+ Нова категорија</button>
       </div>
+      <p class="hint tab-hint">Категориите го групираат ценовникот и рекапитуларот. Бришењето е можно само ако нема материјали во категоријата.</p>
       <div class="card"><table class="data" id="catTable">
         <thead><tr><th style="width:40px;"></th><th>ID</th><th>Име</th><th class="num">Материјали</th><th></th></tr></thead>
         <tbody></tbody>
@@ -108,10 +117,26 @@
     <!-- ПАРАМЕТРИ -->
     <div class="tab-panel" id="tab-inputs">
       <div class="toolbar">
-        <span class="hint">Влезните параметри се полињата што клиентот ги пополнува во калкулаторот. Клучот се користи во формулите на материјалите.</span>
+        <input type="text" id="inpSearch" placeholder="Барај по клуч или име…" style="width: 240px;">
+        <select id="inpGroupFilter"><option value="">Сите групи</option></select>
+        <select id="inpTypeFilter">
+          <option value="">Сите типови</option>
+          <option value="number">Број</option>
+          <option value="boolean">Да / не</option>
+          <option value="price">Цена</option>
+          <option value="factor">Коефициент</option>
+          <option value="derived">Изведен</option>
+        </select>
+        <select id="inpUseFilter">
+          <option value="">Сите</option>
+          <option value="used">Се користи во формули</option>
+          <option value="unused">Не се користи</option>
+        </select>
+        <span class="hint" id="inpCount"></span>
         <span style="flex: 1;"></span>
         <button class="btn accent small" id="addInput">+ Нов параметар</button>
       </div>
+      <p class="hint tab-hint">Влезните параметри се полињата што клиентот ги пополнува во калкулаторот. Клучот се користи во формулите на материјалите.</p>
       <div class="card" style="overflow-x: auto;"><table class="data" id="inputTable">
         <thead><tr><th>Клуч</th><th>Име</th><th>Група</th><th>Тип</th><th class="num">Стандардно</th><th>Ед.</th><th></th></tr></thead>
         <tbody></tbody>
@@ -307,6 +332,64 @@
       <span style="flex: 1;"></span>
       <button class="btn ghost" data-close>Откажи</button>
       <button class="btn accent" id="mSave">Зачувај</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модал за нов параметар -->
+<div class="modal-back" id="inpModal">
+  <div class="modal" style="max-width: 580px;">
+    <div class="modal-head"><h3>Нов параметар</h3><button class="x-close" data-close>×</button></div>
+    <div class="modal-body">
+      <div class="field pm-type">
+        <label>Тип</label>
+        <div class="seg" id="pType">
+          <button type="button" class="seg-btn on" data-t="number">Број<small>количина, m²</small></button>
+          <button type="button" class="seg-btn" data-t="boolean">Да / не<small>прекинувач</small></button>
+          <button type="button" class="seg-btn" data-t="price">Цена<small>во денари</small></button>
+          <button type="button" class="seg-btn" data-t="factor">Коефициент<small>множител ×</small></button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Име <span class="unit">како се прикажува во калкулаторот</span></label>
+        <input type="text" id="pLabel" placeholder="пр. Површина на гаража" autocomplete="off">
+      </div>
+      <div class="field">
+        <label>Клуч <span class="unit">за формулите — латиница, бројки и _</span></label>
+        <input type="text" id="pKey" class="mono" placeholder="GARAZA" autocomplete="off" spellcheck="false">
+        <div class="hint" id="pKeyHint"></div>
+      </div>
+
+      <div class="pm-row">
+        <div class="field"><label>Група</label>
+          <select id="pGroup"></select>
+          <input type="text" id="pGroupNew" placeholder="Име на новата група" style="display: none; margin-top: 6px;">
+        </div>
+        <div class="field pm-num"><label>Ед. мера</label><input type="text" id="pUnit" placeholder="m², ком…"></div>
+        <div class="field pm-num"><label>Стандардна вредност</label><input type="number" step="any" min="0" id="pDef" value="0"></div>
+      </div>
+
+      <div class="field pm-bool">
+        <label>Ексклузивна група <span class="unit">само еден прекинувач од групата смее да е вклучен</span></label>
+        <select id="pExc"></select>
+        <input type="text" id="pExcNew" placeholder="Име на ексклузивната група (пр. СИСТЕМ)" style="display: none; margin-top: 6px;">
+      </div>
+
+      <div class="pm-num pm-gate">
+        <div class="field">
+          <label>Важи само ако е вклучен</label>
+          <select id="pGate"></select>
+        </div>
+        <label class="toggle" id="pReveal" style="display: none;"><span class="t-label">Скриј го полето додека прекинувачот е исклучен</span><span class="knob"></span></label>
+      </div>
+
+      <div class="pm-preview" id="pPreview"></div>
+      <div class="error-note" id="pError" style="display: none;"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn ghost" data-close>Откажи</button>
+      <button class="btn accent" id="pSave">Додади параметар</button>
     </div>
   </div>
 </div>

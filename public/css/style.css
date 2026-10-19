@@ -140,11 +140,26 @@ table.data .cat-row td { background: var(--panel); font-family: var(--disp); fon
 /* Ексклузивен избор — визуелно е очигледно дека важи само една опција */
 .ci-exc, .ci-terrace { grid-column: span 2; }
 @media (max-width: 640px) { .ci-exc, .ci-terrace { grid-column: span 1; } }
-:is(.ci-exc, .ci-terrace) .seg { display: flex; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: #fff; }
-:is(.ci-exc, .ci-terrace) .seg-btn { flex: 1; padding: 8px 6px; font-family: var(--sans); font-size: 12px; line-height: 1.25; background: transparent; border: 0; border-right: 1px solid var(--line); cursor: pointer; color: var(--ink-soft); }
-:is(.ci-exc, .ci-terrace) .seg-btn:last-child { border-right: 0; }
-:is(.ci-exc, .ci-terrace) .seg-btn:hover { background: var(--panel); }
-:is(.ci-exc, .ci-terrace) .seg-btn.on { background: var(--accent); color: #fff; }
+:is(.ci-exc, .ci-terrace, .pm-type) .seg { display: flex; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: #fff; }
+:is(.ci-exc, .ci-terrace, .pm-type) .seg-btn { flex: 1; padding: 8px 6px; font-family: var(--sans); font-size: 12px; line-height: 1.25; background: transparent; border: 0; border-right: 1px solid var(--line); cursor: pointer; color: var(--ink-soft); }
+:is(.ci-exc, .ci-terrace, .pm-type) .seg-btn:last-child { border-right: 0; }
+:is(.ci-exc, .ci-terrace, .pm-type) .seg-btn:hover { background: var(--panel); }
+:is(.ci-exc, .ci-terrace, .pm-type) .seg-btn.on { background: var(--accent); color: #fff; }
+
+/* ═══ Модал за нов параметар ═══ */
+.pm-type .seg-btn { padding: 10px 6px; font-weight: 600; color: var(--ink); }
+.pm-type .seg-btn small { display: block; margin-top: 2px; font-weight: 400; font-size: 10.5px; color: var(--muted); }
+.pm-type .seg-btn.on small { color: rgba(255,255,255,.85); }
+.pm-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 12px; align-items: start; }
+.pm-gate { display: grid; gap: 8px; }
+.pm-preview { font-size: 12.5px; color: var(--ink-soft); background: var(--panel); border: 1px solid var(--line); border-radius: 2px; padding: 10px 12px; line-height: 1.55; }
+.pm-preview code { font-family: var(--mono); background: #fff; border: 1px solid var(--line); padding: 1px 5px; border-radius: 2px; color: var(--ink); }
+#inpModal input.bad { border-color: var(--accent); }
+@media (max-width: 640px) {
+  .pm-row { grid-template-columns: 1fr; }
+  .pm-type .seg { flex-wrap: wrap; }
+  .pm-type .seg-btn { flex: 1 1 50%; border-bottom: 1px solid var(--line); }
+}
 .ci-terrace .ter-row { display: grid; gap: 6px; }
 .ci-exc .seg-none { flex: 0 0 54px; font-family: var(--mono); font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; }
 /* Условено поле — важи само ако придружниот прекинувач е вклучен */

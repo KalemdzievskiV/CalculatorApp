@@ -5,6 +5,7 @@
   let cfg = null;
 
   const $ = (s) => document.querySelector(s);
+  const $$ = (s) => document.querySelectorAll(s);
   const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const fmt = (v) => new Intl.NumberFormat('mk-MK', { maximumFractionDigits: 2 }).format(v);
 
@@ -136,7 +137,7 @@
     $('#matModal').classList.add('open');
   }
   $('#mActive').onclick = () => $('#mActive').classList.toggle('on');
-  document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => $('#matModal').classList.remove('open'); });
+  document.querySelectorAll('[data-close]').forEach((b) => { b.onclick = () => b.closest('.modal-back').classList.remove('open'); });
 
   function knownVarsAndCodes() {
     // PRICE е достапна само во priceFormula (основната цена на самата ставка)
@@ -238,7 +239,30 @@
       const del = tr.querySelector('.del');
       if (del) del.onclick = async () => { if (confirm('Избриши категорија?')) { cfg.categories.splice(i, 1); await save('categories'); renderCategories(); fillCatFilter(); } };
     });
+    filterCategories();
   }
+
+  // Ги крие редовите што не одговараат (без повторно исцртување — индексите остануваат точни)
+  function filterRows(body, match, countEl) {
+    const rows = [...body.querySelectorAll('tr[data-i]')];
+    let shown = 0;
+    rows.forEach((tr) => { const ok = match(Number(tr.dataset.i)); tr.classList.toggle('no-match', !ok); if (ok) shown++; });
+    countEl.textContent = shown === rows.length ? rows.length + ' вкупно' : shown + ' од ' + rows.length;
+  }
+
+  function filterCategories() {
+    const q = $('#catSearch').value.trim().toLowerCase();
+    const f = $('#catFilter').value;
+    filterRows($('#catTable tbody'), (i) => {
+      const c = cfg.categories[i];
+      const count = cfg.materials.filter((m) => m.cat === c.id).length;
+      if (f === 'used' && !count) return false;
+      if (f === 'empty' && count) return false;
+      return !q || (c.name + ' ' + c.id).toLowerCase().includes(q);
+    }, $('#catCount'));
+  }
+  $('#catSearch').oninput = filterCategories;
+  $('#catFilter').onchange = filterCategories;
   $('#addCat').onclick = async () => {
     const name = prompt('Име на новата категорија:');
     if (!name) return;
@@ -282,36 +306,153 @@
         renderInputs();
       };
     });
+    fillInpGroupFilter();
+    filterInputs();
   }
-  $('#addInput').onclick = async () => {
-    const key = (prompt('Клуч (латиница, без празни места, пр. GARAZA):') || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '');
-    if (!key) return;
-    if (cfg.inputs.some((x) => x.key === key)) return alert('Клучот постои');
-    const label = prompt('Име (како ќе се прикаже во калкулаторот):') || key;
-    const type = confirm('Да/не прекинувач? (Откажи = броен параметар)') ? 'boolean' : 'number';
-    const group = prompt('Група:\n' + cfg.inputGroups.join(', '), cfg.inputGroups[0]) || cfg.inputGroups[0];
-    if (!cfg.inputGroups.includes(group)) { cfg.inputGroups.push(group); await save('inputGroups'); }
-    const inp = { key, label, group, type, def: 0, unit: '' };
 
-    if (type === 'boolean') {
-      // Ексклузивна група — спречува два меѓусебно исклучиви избора да бидат вклучени заедно
-      const exc = (prompt('Ексклузивна група (празно = без):\nПостоечки: ' +
-        [...new Set(cfg.inputs.map((i) => i.exclusive).filter(Boolean))].join(', ')) || '').trim();
+  function fillInpGroupFilter() {
+    const sel = $('#inpGroupFilter'), cur = sel.value;
+    sel.innerHTML = '<option value="">Сите групи</option>' + cfg.inputGroups.map((g) => `<option>${esc(g)}</option>`).join('');
+    if (cfg.inputGroups.includes(cur)) sel.value = cur;
+  }
+
+  const inpKind = (inp) => (inp.type === 'boolean' || inp.type === 'derived' ? inp.type : inp.role === 'price' || inp.role === 'factor' ? inp.role : 'number');
+  function filterInputs() {
+    const q = $('#inpSearch').value.trim().toLowerCase();
+    const g = $('#inpGroupFilter').value, t = $('#inpTypeFilter').value, use = $('#inpUseFilter').value;
+    // Сите формули (материјали + изведени параметри) за проверка дали клучот се користи
+    const formulas = cfg.materials.map((m) => (m.formula || '') + ' ' + (m.priceFormula || ''))
+      .concat(cfg.inputs.map((i) => i.formula || '')).join(' ');
+    filterRows($('#inputTable tbody'), (i) => {
+      const inp = cfg.inputs[i];
+      if (g && inp.group !== g) return false;
+      if (t && inpKind(inp) !== t) return false;
+      if (use) {
+        // Прекинувач е „користен" и ако е услов за друго поле
+        // Моторот директно ги користи: коефициентите за дограма и површините по кат (збир кај два ката)
+        const used = new RegExp('\\b' + inp.key + '\\b').test(formulas) || cfg.inputs.some((x) => x.gate === inp.key)
+          || !!inp.target || ['AREA_F1', 'AREA_F2', 'TERRACE_F1', 'TERRACE_F2'].includes(inp.key);
+        if ((use === 'used') !== used) return false;
+      }
+      return !q || (inp.key + ' ' + inp.label + ' ' + (inp.unit || '')).toLowerCase().includes(q);
+    }, $('#inpCount'));
+  }
+  ['#inpSearch'].forEach((id) => { $(id).oninput = filterInputs; });
+  ['#inpGroupFilter', '#inpTypeFilter', '#inpUseFilter'].forEach((id) => { $(id).onchange = filterInputs; });
+  // ── Нов параметар (модал) ──
+  // Кирилица → латиница за клучот (пр. „Меѓукатна" → MEGUKATNA)
+  const TRANSLIT = { а: 'A', б: 'B', в: 'V', г: 'G', д: 'D', ѓ: 'G', е: 'E', ж: 'ZH', з: 'Z', ѕ: 'DZ', и: 'I', ј: 'J', к: 'K', л: 'L', љ: 'LJ', м: 'M', н: 'N', њ: 'NJ', о: 'O', п: 'P', р: 'R', с: 'S', т: 'T', ќ: 'K', у: 'U', ф: 'F', х: 'H', ц: 'C', ч: 'CH', џ: 'DZ', ш: 'SH' };
+  const keyFrom = (label) => [...label.toLowerCase()].map((c) => TRANSLIT[c] ?? c).join('')
+    .toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 24);
+  const cleanKey = (k) => k.toUpperCase().replace(/[^A-Z0-9_]/g, '');
+  const NEW = '__new__';
+
+  const pm = { type: 'number', keyTouched: false };
+  const pmType = () => (pm.type === 'boolean' ? 'boolean' : 'number');
+
+  function pmFill() {
+    $('#pGroup').innerHTML = cfg.inputGroups.map((g) => `<option>${esc(g)}</option>`).join('') + `<option value="${NEW}">+ Нова група…</option>`;
+    const excs = [...new Set(cfg.inputs.map((i) => i.exclusive).filter(Boolean))];
+    $('#pExc').innerHTML = '<option value="">Без — независен прекинувач</option>' + excs.map((e) => `<option>${esc(e)}</option>`).join('') + `<option value="${NEW}">+ Нова ексклузивна група…</option>`;
+    $('#pGate').innerHTML = '<option value="">Секогаш</option>' + cfg.inputs.filter((i) => i.type === 'boolean')
+      .map((i) => `<option value="${i.key}">${esc(i.label)} (${i.key})</option>`).join('');
+  }
+
+  // Прикажува само полињата што важат за избраниот тип + преглед и проверка на клучот
+  function pmSync() {
+    $('#pError').style.display = 'none';
+    const isBool = pm.type === 'boolean';
+    $$('#inpModal .pm-num').forEach((el) => { el.style.display = isBool ? 'none' : ''; });
+    $$('#inpModal .pm-bool').forEach((el) => { el.style.display = isBool ? '' : 'none'; });
+    $('#pGroupNew').style.display = $('#pGroup').value === NEW ? '' : 'none';
+    $('#pExcNew').style.display = $('#pExc').value === NEW ? '' : 'none';
+    $('#pReveal').style.display = $('#pGate').value ? '' : 'none';
+    if (pm.type === 'price') $('#pUnit').placeholder = 'ден';
+    else $('#pUnit').placeholder = pm.type === 'factor' ? '×' : 'm², ком…';
+
+    const key = cleanKey($('#pKey').value);
+    const taken = key && cfg.inputs.some((x) => x.key === key);
+    $('#pKey').classList.toggle('bad', !!taken);
+    $('#pKeyHint').textContent = taken ? 'Овој клуч веќе постои — изберете друг.' : '';
+    $('#pKeyHint').style.color = taken ? 'var(--accent)' : '';
+
+    const label = $('#pLabel').value.trim() || 'Новиот параметар';
+    const gate = $('#pGate').value;
+    const gateInp = gate && cfg.inputs.find((i) => i.key === gate);
+    const k = key ? `<code>${esc(key)}</code>` : 'клучот';
+    let txt = {
+      number: `<b>${esc(label)}</b> ќе биде броен влез. Во формулите го користите како ${k}, пр. <code>${esc(key || 'KLUC')} * 2</code>.`,
+      boolean: `<b>${esc(label)}</b> ќе биде прекинувач (1 = вклучен, 0 = исклучен). Во формулите: <code>… * ${esc(key || 'KLUC')}</code> — ставката се наплаќа само кога е вклучен.`,
+      price: `<b>${esc(label)}</b> ќе биде цена во денари по проект. Ставете ја во „Формула за цена" на материјал: ${k}.`,
+      factor: `<b>${esc(label)}</b> ќе биде коефициент (стандардно 1). Пр. во „Формула за цена": <code>PRICE * ${esc(key || 'KLUC')}</code>.`,
+    }[pm.type];
+    if (gateInp) txt += ` Важи само кога е вклучено „${esc(gateInp.label)}"${$('#pReveal').classList.contains('on') ? ', а дотогаш полето е скриено' : ''}.`;
+    $('#pPreview').innerHTML = txt;
+  }
+
+  function openInpModal() {
+    Object.assign(pm, { type: 'number', keyTouched: false });
+    pmFill();
+    $$('#pType .seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.t === 'number'));
+    ['#pLabel', '#pKey', '#pUnit', '#pGroupNew', '#pExcNew'].forEach((id) => { $(id).value = ''; });
+    $('#pDef').value = 0;
+    $('#pReveal').classList.remove('on');
+    $('#pError').style.display = 'none';
+    pmSync();
+    $('#inpModal').classList.add('open');
+    $('#pLabel').focus();
+  }
+
+  $('#addInput').onclick = openInpModal;
+  $$('#pType .seg-btn').forEach((b) => {
+    b.onclick = () => {
+      pm.type = b.dataset.t;
+      $$('#pType .seg-btn').forEach((x) => x.classList.toggle('on', x === b));
+      const d = $('#pDef');
+      if (pm.type === 'factor' && (d.value === '' || +d.value === 0)) d.value = 1;
+      else if (pm.type !== 'factor' && +d.value === 1) d.value = 0;
+      pmSync();
+    };
+  });
+  $('#pLabel').oninput = () => { if (!pm.keyTouched) $('#pKey').value = keyFrom($('#pLabel').value); pmSync(); };
+  $('#pKey').oninput = () => { pm.keyTouched = $('#pKey').value !== ''; $('#pKey').value = cleanKey($('#pKey').value); pmSync(); };
+  ['#pGroup', '#pExc', '#pGate'].forEach((id) => { $(id).onchange = pmSync; });
+  $('#pReveal').onclick = () => { $('#pReveal').classList.toggle('on'); pmSync(); };
+
+  $('#pSave').onclick = async () => {
+    const err = (m) => { $('#pError').textContent = m; $('#pError').style.display = ''; };
+    const key = cleanKey($('#pKey').value);
+    const label = $('#pLabel').value.trim();
+    if (!label) return err('Внесете име на параметарот.');
+    if (!key) return err('Внесете клуч (латиница, бројки и _).');
+    if (/^[0-9]/.test(key)) return err('Клучот не смее да почнува со бројка.');
+    if (cfg.inputs.some((x) => x.key === key)) return err('Клучот ' + key + ' веќе постои.');
+    let group = $('#pGroup').value;
+    if (group === NEW) group = $('#pGroupNew').value.trim();
+    if (!group) return err('Внесете име на новата група.');
+
+    const inp = { key, label, group, type: pmType(), def: 0, unit: '' };
+    if (pm.type === 'boolean') {
+      let exc = $('#pExc').value;
+      if (exc === NEW) exc = $('#pExcNew').value.trim();
+      if ($('#pExc').value === NEW && !exc) return err('Внесете име на ексклузивната група.');
       if (exc) inp.exclusive = exc;
     } else {
-      const gate = (prompt('Важи само ако овој прекинувач е вклучен (клуч, празно = секогаш):') || '').trim().toUpperCase();
+      inp.unit = $('#pUnit').value.trim();
+      inp.def = parseFloat($('#pDef').value) || 0;
+      if (pm.type === 'price' || pm.type === 'factor') inp.role = pm.type;
+      if (pm.type === 'factor' && !inp.def) inp.def = 1;
+      const gate = $('#pGate').value;
       if (gate) {
-        const g = cfg.inputs.find((i) => i.key === gate);
-        if (!g || g.type !== 'boolean') return alert('Нема прекинувач со клуч ' + gate);
         inp.gate = gate;
+        if ($('#pReveal').classList.contains('on')) inp.reveal = true;
       }
-      const role = (prompt('Улога — остави празно за обичен број, "price" за цена во ден, "factor" за коефициент:') || '').trim();
-      if (role === 'price' || role === 'factor') inp.role = role;
-      if (role === 'factor') inp.def = 1;
     }
 
+    if (!cfg.inputGroups.includes(group)) { cfg.inputGroups.push(group); await save('inputGroups'); }
     cfg.inputs.push(inp);
     await save('inputs');
+    $('#inpModal').classList.remove('open');
     renderInputs();
   };
 
