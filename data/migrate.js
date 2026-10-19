@@ -11,7 +11,7 @@
  *  · Секоја промена се пријавува во конзола за да се види што се случило при подигање.
  */
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 // [код, стара фиксна количина, нова формула]
 const REWIRE_QTY = [
@@ -169,6 +169,28 @@ const MIGRATIONS = [
     for (const q of db.quotes || []) {
       const i = q.inputs || {};
       if (i.FAS_DRVO == null && (i.FAS_PATOS > 0 || i.OKAPNICI > 0)) { i.FAS_DRVO = 1; log('понуда ' + q.id + ' → FAS_DRVO=1'); }
+    }
+  },
+
+  /* 3 → 4: фасадниот лим (и ленти) исто така спаѓа под „Фасада патос / дрво". */
+  function facadeSheetUnderWood(db, seed, log) {
+    // Прекинувачот оди пред лимот, за полињата да стојат под него
+    const at = db.inputs.findIndex((i) => i.key === 'FAS_DRVO');
+    const lim = db.inputs.findIndex((i) => i.key === 'FAS_LIM');
+    if (at > lim && lim >= 0) {
+      db.inputs.splice(lim, 0, db.inputs.splice(at, 1)[0]);
+      log('FAS_DRVO преместен пред FAS_LIM');
+    }
+    for (const key of ['FAS_LIM', 'FAS_LIM_LENTI']) {
+      const cur = db.inputs.find((i) => i.key === key);
+      if (!cur || cur.gate) continue;
+      cur.gate = 'FAS_DRVO';
+      cur.reveal = true;
+      log(key + ' → gate=FAS_DRVO');
+    }
+    for (const q of db.quotes || []) {
+      const i = q.inputs || {};
+      if (!i.FAS_DRVO && (i.FAS_LIM > 0 || i.FAS_LIM_LENTI > 0)) { i.FAS_DRVO = 1; log('понуда ' + q.id + ' → FAS_DRVO=1'); }
     }
   },
 ];
