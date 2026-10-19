@@ -32,6 +32,20 @@ const inputs = [
   { key: 'SIMS',          label: 'Симс околу објект', unit: 'm²', type: 'number', def: 11, group: 'ОСНОВНИ МЕРКИ' },
   { key: 'AREA',          label: 'Вкупна површина', unit: 'm²', type: 'derived', formula: 'AREA_HOUSE + AREA_TERRACE', group: 'ОСНОВНИ МЕРКИ' },
 
+  // Куќа на два ката — полињата по кат важат само кога TWO_FLOORS е вклучен.
+  // Тогаш AREA_HOUSE и AREA_TERRACE се збир од двата ката (го пресметува моторот).
+  { key: 'TWO_FLOORS',    label: 'Куќа на два ката', type: 'boolean', def: 0, group: 'ОСНОВНИ МЕРКИ' },
+  { key: 'AREA_F1',       label: 'Површина на прв кат', unit: 'm²', type: 'number', def: 0, group: 'ОСНОВНИ МЕРКИ', gate: 'TWO_FLOORS' },
+  { key: 'AREA_F2',       label: 'Површина на втор кат', unit: 'm²', type: 'number', def: 0, group: 'ОСНОВНИ МЕРКИ', gate: 'TWO_FLOORS' },
+  { key: 'TERRACE_F1',    label: 'Тераса на прв кат', unit: 'm²', type: 'number', def: 0, group: 'ОСНОВНИ МЕРКИ', gate: 'TWO_FLOORS' },
+  { key: 'TERRACE_F2',    label: 'Тераса на втор кат', unit: 'm²', type: 'number', def: 0, group: 'ОСНОВНИ МЕРКИ', gate: 'TWO_FLOORS' },
+  { key: 'FLOOR_H2',      label: 'Висина на втор кат', unit: 'm', type: 'number', def: 2.85, group: 'ОСНОВНИ МЕРКИ', gate: 'TWO_FLOORS' },
+  { key: 'WALL_OUT2',     label: 'Надворешни ѕидови должина (втор кат)', unit: 'm', type: 'number', def: 0, group: 'ОСНОВНИ МЕРКИ', gate: 'TWO_FLOORS' },
+  { key: 'WALL_IN2',      label: 'Внатрешни ѕидови должина (втор кат)', unit: 'm', type: 'number', def: 0, group: 'ОСНОВНИ МЕРКИ', gate: 'TWO_FLOORS' },
+  { key: 'WALL_OUT_M2',   label: 'Површина надворешни ѕидови', unit: 'm²', type: 'derived', formula: 'WALL_OUT*FLOOR_H + WALL_OUT2*FLOOR_H2', group: 'ОСНОВНИ МЕРКИ' },
+  { key: 'WALL_IN_M2',    label: 'Површина внатрешни ѕидови', unit: 'm²', type: 'derived', formula: 'WALL_IN*FLOOR_H + WALL_IN2*FLOOR_H2', group: 'ОСНОВНИ МЕРКИ' },
+  { key: 'HEIGHT',        label: 'Вкупна висина на објект', unit: 'm', type: 'derived', formula: 'FLOOR_H + FLOOR_H2', group: 'ОСНОВНИ МЕРКИ' },
+
   { key: 'KAMENA',        label: 'Камена волна конструкција', type: 'boolean', def: 1, group: 'КОНСТРУКЦИЈА И СИСТЕМ', exclusive: 'СИСТЕМ' },
   { key: 'SIP',           label: 'СИП панел конструкција', type: 'boolean', def: 0, group: 'КОНСТРУКЦИЈА И СИСТЕМ', exclusive: 'СИСТЕМ' },
   { key: 'MONTAZA',       label: 'МДА монтажа', type: 'boolean', def: 1, group: 'КОНСТРУКЦИЈА И СИСТЕМ' },
@@ -120,18 +134,18 @@ const materials = [
   m('K03', 'KONSTRUKCIJA', 'КОНСТРУКЦИЈА 5Х10', 'м3', 24525, '(AREA/120)*KAMENA', { grey: 1 }),
   m('K04', 'KONSTRUKCIJA', 'КОНСТРУКЦИЈА 5Х15', 'м3', 24525, '(AREA/10)*KAMENA', { grey: 1 }),
   m('K05', 'KONSTRUKCIJA', 'КОНСТРУКЦИЈА 5Х20', 'м3', 24525, '(AREA/24)*KAMENA', { grey: 1 }),
-  m('K06', 'KONSTRUKCIJA', 'ТЕР ХАРТИЈА ПОД', 'м1', 250, 'WALL_OUT + WALL_IN', { grey: 1 }),
+  m('K06', 'KONSTRUKCIJA', 'ТЕР ХАРТИЈА ПОД', 'м1', 250, 'WALL_OUT + WALL_IN + WALL_OUT2 + WALL_IN2', { grey: 1 }),
   m('K07', 'KONSTRUKCIJA', 'РАБОТНА ДРВО', 'кол', 12262.5, 'qty("K01")+qty("K02")+qty("K03")+qty("K04")+qty("K05")', { grey: 1 }),
 
   // ─── СИП ПАНЕЛ ───
-  m('S01', 'SIP_PANEL', 'СИП ПАНЕЛ 12cm', 'м2', 1565, '(((WALL_OUT+WALL_IN)*FLOOR_H)+ROOF)*SIP'),
+  m('S01', 'SIP_PANEL', 'СИП ПАНЕЛ 12cm', 'м2', 1565, '(WALL_OUT_M2+WALL_IN_M2+ROOF)*SIP'),
   m('S02', 'SIP_PANEL', 'КОНСТРУКЦИЈА 10Х10', 'м3', 23560, 'qty("S01")/40'),
   m('S03', 'SIP_PANEL', 'КНАУФ ШТРАФ СИП ПАНЕЛ', 'кол', 2, 'qty("S01")*20'),
   m('S04', 'SIP_PANEL', 'РАБОТНА СИП', 'м2', 390, 'qty("S01")'),
 
   // ─── ЗАШТИТА ───
-  m('Z01', 'ZASHTITA', 'ПАРНА БРАНА', 'м2', 60, '((WALL_OUT*FLOOR_H)+ROOF+30)*KAMENA'),
-  m('Z02', 'ZASHTITA', 'ПАРОПРОПУСТНА ФОЛИЈА', 'м2', 60, '((WALL_OUT*FLOOR_H)+ROOF+30)*KAMENA', { grey: 1 }),
+  m('Z01', 'ZASHTITA', 'ПАРНА БРАНА', 'м2', 60, '(WALL_OUT_M2+ROOF+30)*KAMENA'),
+  m('Z02', 'ZASHTITA', 'ПАРОПРОПУСТНА ФОЛИЈА', 'м2', 60, '(WALL_OUT_M2+ROOF+30)*KAMENA', { grey: 1 }),
   m('Z03', 'ZASHTITA', 'ХЕФТ МУНИЦИЈА 8016', 'кол', 300, 'qty("Z01")/50', { grey: 1 }),
   m('Z04', 'ZASHTITA', 'РАБОТНА ФОЛИЈА', 'пауш', 60, 'qty("Z01")+qty("Z02")', { grey: 0.5 }),
 
@@ -148,8 +162,8 @@ const materials = [
   m('F04', 'FASADA', 'БОЈА СМОЛА', 'л', 680, 'qty("F03")/2.5'),
   m('F05', 'FASADA', 'КЛАМФИ ЗА ПАТОС 9040', 'кол', 400, 'qty("F03")/10'),
   m('F06', 'FASADA', 'ЛАЈСНИ ОД ДРВО', 'м1', 500, 'OKAPNICI'),
-  m('F07', 'FASADA', 'СТИРОПОР 5СМ', 'м2', 170, '((FLOOR_H*WALL_OUT)+5)*ABRIB', { grey: 1 }),
-  m('F08', 'FASADA', 'ОСБ 9мм', 'м2', 260, '((FLOOR_H*WALL_OUT)+20)*ABRIB', { grey: 2 }),
+  m('F07', 'FASADA', 'СТИРОПОР 5СМ', 'м2', 170, '(WALL_OUT_M2+5)*ABRIB', { grey: 1 }),
+  m('F08', 'FASADA', 'ОСБ 9мм', 'м2', 260, '(WALL_OUT_M2+20)*ABRIB', { grey: 2 }),
   m('F09', 'FASADA', 'ШТРАФОВИ 3Х7 КНАУФ', 'кол', 2, 'qty("F07")*10', { grey: 1 }),
   m('F10', 'FASADA', 'КАПИ ЗА СТИРОПОР', 'кол', 2, 'qty("F09")', { grey: 1 }),
   m('F11', 'FASADA', 'ПУР ЛЕПИЛО', 'кол', 370, 'qty("F07")/8', { grey: 1 }),
@@ -162,7 +176,7 @@ const materials = [
   m('F18', 'FASADA', 'ПРЕМИУМ ФАСАДА', 'м2', 3238, 'PREMIUM_FAS_M2'),
 
   // ─── ИЗОЛАЦИЈА ───
-  m('I01', 'IZOLACIJA', 'ТЕРВОЛ 5СМ', 'м2', 75, '(((WALL_OUT+WALL_IN)*FLOOR_H)+ROOF)*KAMENA'),
+  m('I01', 'IZOLACIJA', 'ТЕРВОЛ 5СМ', 'м2', 75, '(WALL_OUT_M2+WALL_IN_M2+ROOF)*KAMENA'),
   m('I02', 'IZOLACIJA', 'ТЕРВОЛ 10СМ', 'м2', 150, 'qty("I01")', { grey: 1 }),
   m('I03', 'IZOLACIJA', 'СТАКЛЕНА ВОЛНА СО А.5СМ', 'м2', 180, 0),
   m('I04', 'IZOLACIJA', 'ТЕРВОЛ 30КГ 5СМ', 'м2', 160, 0),
@@ -184,7 +198,7 @@ const materials = [
   m('SR11', 'SHTRAFOVI', 'АНКЕР ШТРАФОВИ парче', 'пар', 34, '(AREA/2)*KAMENA', { grey: 1 }),
 
   // ─── ГИПС КАРТОН ───
-  m('G01', 'GIPS_KARTON', 'ГИПС КАРТОН 1.25', 'м2', 138, '(((WALL_OUT+(WALL_IN*2))*FLOOR_H)+AREA_HOUSE)*GIPS'),
+  m('G01', 'GIPS_KARTON', 'ГИПС КАРТОН 1.25', 'м2', 138, '(WALL_OUT_M2+(WALL_IN_M2*2)+AREA_HOUSE)*GIPS'),
   m('G02', 'GIPS_KARTON', 'ЗЕЛЕН ГИПС КАРТОН 1.25', 'м2', 195, 'qty("G01")/10'),
   m('G03', 'GIPS_KARTON', 'ШТРАФОВИ КНАУФ 3.5', 'пар', 2, '(qty("G01")+qty("G02"))*10'),
   m('G04', 'GIPS_KARTON', 'РАДИКОЛ 30кг', 'пак', 900, '(qty("G01")+qty("G02"))/50'),
@@ -329,7 +343,7 @@ const materials = [
   m('R03', 'POKRIVANJE', 'ЛИМ ПОКРИВЕН', 'м2', 1450, 'ROOF*ROOF_LIM', { grey: 1, priceFormula: 'PRICE * BOJA_LIM' }),
   m('R04', 'POKRIVANJE', 'ЛИМ ЅИДЕН', 'м2', 1225, 0, { priceFormula: 'PRICE * BOJA_LIM' }),
   m('R05', 'POKRIVANJE', 'ВЕТЕРЛАЈСНИ', 'м1', 980, '((WALL_OUT+10)+(AREA/10))*ROOF_LIM', { grey: 1 }),
-  m('R06', 'POKRIVANJE', 'ВЕРТИКАЛНИ ОЛУЦИ', 'м1', 980, '(FLOOR_H*9)*ROOF_LIM', { grey: 1 }),
+  m('R06', 'POKRIVANJE', 'ВЕРТИКАЛНИ ОЛУЦИ', 'м1', 980, '(HEIGHT*9)*ROOF_LIM', { grey: 1 }),
   m('R07', 'POKRIVANJE', 'ХОРИЗОНТАЛНИ ОЛУЦИ', 'м1', 980, '(WALL_OUT/2.3)*ROOF_LIM', { grey: 1 }),
   m('R08', 'POKRIVANJE', 'СЛЕМЕ', 'м1', 950, '(AREA/19)*ROOF_LIM', { grey: 1 }),
   m('R09', 'POKRIVANJE', 'СИМС ОКОЛУ ОБЈЕКТ', 'м2', 3200, 'SIMS', { grey: 1 }),

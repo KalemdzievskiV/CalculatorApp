@@ -11,7 +11,7 @@
  *  · Секоја промена се пријавува во конзола за да се види што се случило при подигање.
  */
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 // [код, стара фиксна количина, нова формула]
 const REWIRE_QTY = [
@@ -54,6 +54,31 @@ const ADD_PRICE_FORMULA = [
   ['D01', 'PRICE * BOJA_VRATI'],
   ['D02', 'PRICE * BOJA_VRATI'],
 ];
+
+// [код, прифатливи стари формули, нова формула] — ѕидови и висина по кат (куќа на два ката).
+// За еднокатна куќа (WALL_OUT2 = WALL_IN2 = FLOOR_H2 = 0) новите формули даваат исти бројки.
+const TWO_FLOOR_FORMULA = [
+  ['K06', ['WALL_OUT + WALL_IN'], 'WALL_OUT + WALL_IN + WALL_OUT2 + WALL_IN2'],
+  ['S01', ['(((WALL_OUT+WALL_IN)*FLOOR_H)+ROOF)*SIP'], '(WALL_OUT_M2+WALL_IN_M2+ROOF)*SIP'],
+  ['Z01', ['((WALL_OUT*FLOOR_H)+ROOF+30)*KAMENA'], '(WALL_OUT_M2+ROOF+30)*KAMENA'],
+  ['Z02', ['((WALL_OUT*FLOOR_H)+ROOF+30)*KAMENA'], '(WALL_OUT_M2+ROOF+30)*KAMENA'],
+  ['F07', ['((FLOOR_H*WALL_OUT)+5)*ABRIB'], '(WALL_OUT_M2+5)*ABRIB'],
+  ['F08', ['((FLOOR_H*WALL_OUT)+20)*ABRIB'], '(WALL_OUT_M2+20)*ABRIB'],
+  ['I01', ['(((WALL_OUT+WALL_IN)*FLOOR_H)+ROOF)*KAMENA'], '(WALL_OUT_M2+WALL_IN_M2+ROOF)*KAMENA'],
+  ['G01', ['(((WALL_OUT+(WALL_IN*2))*FLOOR_H)+AREA_HOUSE)*GIPS'], '(WALL_OUT_M2+(WALL_IN_M2*2)+AREA_HOUSE)*GIPS'],
+  ['R06', ['(FLOOR_H*9)*ROOF_LIM'], '(HEIGHT*9)*ROOF_LIM'],
+  ['L10', ['((WALL_OUT*FLOOR_H))', 'WALL_OUT*FLOOR_H'], 'WALL_OUT_M2'],
+];
+
+// Нови параметри од seed што ги нема во базата (по редослед од seed)
+function addMissingInputs(db, seed, log) {
+  const have = new Set(db.inputs.map((i) => i.key));
+  for (const inp of seed.inputs) {
+    if (have.has(inp.key)) continue;
+    db.inputs.push(JSON.parse(JSON.stringify(inp)));
+    log('нов параметар: ' + inp.key);
+  }
+}
 
 const MIGRATIONS = [
   /* 0 → 1: фиксните количини стануваат параметри на калкулаторот. */
@@ -106,6 +131,22 @@ const MIGRATIONS = [
       if (!mat || mat.priceFormula) continue;
       mat.priceFormula = pf;
       log(code + ' цена → ' + pf);
+    }
+  },
+
+  /* 1 → 2: куќа на два ката — параметри по кат и формули за ѕидови по површина. */
+  function twoFloors(db, seed, log) {
+    addMissingInputs(db, seed, log);
+    for (const [code, olds, newF] of TWO_FLOOR_FORMULA) {
+      const mat = db.materials.find((m) => m.code === code);
+      if (!mat) continue;
+      const cur = String(mat.formula || '').replace(/\s+/g, '');
+      if (!olds.some((o) => o.replace(/\s+/g, '') === cur)) {
+        log('ПРЕСКОКНАТО ' + code + ' — рачно изменето (' + mat.formula + '), провери го сам за два ката');
+        continue;
+      }
+      mat.formula = newF;
+      log(code + ' → ' + newF);
     }
   },
 ];

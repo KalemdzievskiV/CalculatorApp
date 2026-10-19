@@ -684,13 +684,56 @@
     cfg.inputs.forEach((i) => { if (i.type !== 'derived') calc.inputs[i.key] = i.def; });
     calc.windows = JSON.parse(JSON.stringify(cfg.windowsDefaults || []));
     calc.discountEur = 0;
-    calc.covered = 0;
-    calc.open = null; // null => користи AREA_TERRACE
+    calc.terraceType = 'open';
+    calc.terraceType2 = 'covered';
+    syncTerrace();
     calc.outerH = 4.6;
   }
 
+  // Куќа на два ката: површината на куќа и тераса е збир од двата ката (исто како во моторот)
+  const twoFloors = () => !!calc.inputs.TWO_FLOORS;
+  function sumFloors() {
+    if (!twoFloors()) return;
+    const i = calc.inputs;
+    i.AREA_HOUSE = (i.AREA_F1 || 0) + (i.AREA_F2 || 0);
+    i.AREA_TERRACE = (i.TERRACE_F1 || 0) + (i.TERRACE_F2 || 0);
+    const tot = $('#ciHouseTotal');
+    if (tot) tot.value = q(i.AREA_HOUSE);
+  }
+
+  // Вклучување/исклучување на втор кат: првиот кат ги презема/враќа досегашните вредности
+  function setTwoFloors(on) {
+    const i = calc.inputs;
+    if (on) {
+      if (!(i.AREA_F1 > 0) && !(i.AREA_F2 > 0)) i.AREA_F1 = i.AREA_HOUSE || 0;
+      if (!(i.TERRACE_F1 > 0) && !(i.TERRACE_F2 > 0)) i.TERRACE_F1 = i.AREA_TERRACE || 0;
+      // Втор кат уште непополнет → иста висина како првиот
+      if (!(i.WALL_OUT2 > 0) && !(i.WALL_IN2 > 0)) i.FLOOR_H2 = i.FLOOR_H || 0;
+      i.TWO_FLOORS = 1;
+      sumFloors();
+    } else {
+      i.TWO_FLOORS = 0;
+      i.AREA_HOUSE = i.AREA_F1 || 0;
+      i.AREA_TERRACE = i.TERRACE_F1 || 0;
+    }
+    syncTerrace();
+  }
+
+  // Терасите одат во избраното поле (покриени / откриени); кај два ката секој кат посебно
+  function syncTerrace() {
+    const i = calc.inputs;
+    const ters = twoFloors()
+      ? [[i.TERRACE_F1, calc.terraceType], [i.TERRACE_F2, calc.terraceType2]]
+      : [[i.AREA_TERRACE, calc.terraceType]];
+    calc.covered = ters.reduce((s, [a, t]) => s + (t === 'covered' ? a || 0 : 0), 0);
+    calc.open = ters.reduce((s, [a, t]) => s + (t === 'open' ? a || 0 : 0), 0);
+    const c = $('#cCovered'), o = $('#cOpen');
+    if (c) c.value = calc.covered;
+    if (o) o.value = calc.open;
+  }
+
   // Вкупна површина со симсови = куќа + симсови + тераси (како во Excel: 166+11+12.41 = 189.41)
-  const openTer = () => (calc.open == null ? (calc.inputs.AREA_TERRACE || 0) : calc.open);
+  const openTer = () => calc.open || 0;
   const areaWithSims = () => (calc.inputs.AREA_HOUSE || 0) + (calc.inputs.SIMS || 0) + (calc.covered || 0) + openTer();
 
   function recalcAdmin() {
@@ -724,14 +767,69 @@
       ? `<div class="error-note">Грешки во формулите: ${r.errors.map(esc).join('; ')}</div>` : '';
   }
 
+  // Основни мерки што мора да се пополнат — 0 се означува со црвено (терасата и симсот смеат да бидат 0)
+  const ZERO_OK = ['AREA_TERRACE', 'SIMS', 'TERRACE_F1', 'TERRACE_F2'];
+  const warnZero = (key) => cfg.inputs.some((i) => i.key === key && i.group === 'ОСНОВНИ МЕРКИ') && !ZERO_OK.includes(key);
+  const markZero = (el) => el.classList.toggle('is-zero', warnZero(el.dataset.key) && !(parseFloat(el.value) > 0));
+
   // Полето е активно ако нема услов, или ако придружниот прекинувач е вклучен.
   const gateOpen = (inp) => !inp.gate || !!calc.inputs[inp.gate];
+
+  const inpOf = (key) => cfg.inputs.find((i) => i.key === key);
+  const unitHtml = (u) => (u ? `<span class="unit">${esc(u)}</span>` : '');
+
+  function numFieldHtml(inp, label, cls = '') {
+    return `<div class="field${cls ? ' ' + cls : ''}" data-field="${inp.key}">
+      <label>${esc(label || inp.label)}${unitHtml(inp.unit)}</label>
+      <input type="number" step="any" min="0" data-key="${inp.key}" value="${calc.inputs[inp.key] ?? 0}"></div>`;
+  }
+
+  // Тераса: избор покриена/откриена + површина. typeProp е полето во calc што го чува изборот.
+  function terraceHtml(key, typeProp, label) {
+    const inp = inpOf(key);
+    return `<div class="field ci-terrace">
+      <label>${esc(label || inp.label)}${unitHtml(inp.unit)}</label>
+      <div class="ter-row"><div class="seg">${[['covered', 'Покриена тераса'], ['open', 'Откриена тераса']].map(([t, l]) =>
+        `<button type="button" class="seg-btn${calc[typeProp] === t ? ' on' : ''}" data-ter="${t}" data-ter-prop="${typeProp}">${l}</button>`).join('')}</div>
+      <input type="number" step="any" min="0" data-key="${key}" value="${calc.inputs[key] ?? 0}"></div>
+    </div>`;
+  }
+
+  // ОСНОВНИ МЕРКИ — еден или два ката. Кај два ката: заеднички мерки + посебен блок за секој кат.
+  function basicGroupHtml(g) {
+    const has = (k) => !!inpOf(k);
+    const toggle = has('TWO_FLOORS') ? `<label class="toggle${twoFloors() ? ' on' : ''}" data-key="TWO_FLOORS">
+      <span class="t-label">${esc(inpOf('TWO_FLOORS').label)}</span><span class="knob"></span></label>` : '';
+    const f = (k, label, cls) => (has(k) ? numFieldHtml(inpOf(k), label, cls) : '');
+    const head = `<div class="ci-group"><h4>${esc(g)}</h4>`;
+
+    if (!twoFloors()) {
+      return head + `<div class="ci-grid">${toggle}${f('AREA_HOUSE')}${terraceHtml('AREA_TERRACE', 'terraceType')}${f('FLOOR_H')}
+        ${f('WALL_OUT', null, 'ci-break')}${f('WALL_IN')}${f('ROOF')}${f('SIMS')}</div></div>`;
+    }
+
+    const floor = (n, area, ter, typeProp, h, wo, wi) => `<h5 class="ci-floor">${n} кат</h5><div class="ci-grid">
+      ${f(area, 'Површина на кат')}${terraceHtml(ter, typeProp, 'Површина на тераса')}${f(h, 'Висина на кат')}
+      ${f(wo, 'Надворешни ѕидови должина', 'ci-break')}${f(wi, 'Внатрешни ѕидови должина')}</div>`;
+    const house = inpOf('AREA_HOUSE');
+    return head + `<div class="ci-grid">${toggle}
+        <div class="field"><label>${esc(house.label)} (вкупно)${unitHtml(house.unit)}</label>
+          <input type="text" id="ciHouseTotal" value="${q(calc.inputs.AREA_HOUSE || 0)}" readonly tabindex="-1"></div>
+        ${f('ROOF')}${f('SIMS')}</div>
+      ${floor('Прв', 'AREA_F1', 'TERRACE_F1', 'terraceType', 'FLOOR_H', 'WALL_OUT', 'WALL_IN')}
+      ${floor('Втор', 'AREA_F2', 'TERRACE_F2', 'terraceType2', 'FLOOR_H2', 'WALL_OUT2', 'WALL_IN2')}</div>`;
+  }
+
+  // Клучеви што ги прикажува basicGroupHtml и не смеат да се исцртаат генерички
+  const TERRACE_KEYS = ['AREA_TERRACE', 'TERRACE_F1', 'TERRACE_F2'];
+  const FLOOR_KEYS = ['AREA_F1', 'AREA_F2', ...TERRACE_KEYS];
 
   function renderCalcInputs() {
     const host = $('#cInputs');
     host.innerHTML = cfg.inputGroups.map((g) => {
       const fields = cfg.inputs.filter((i) => i.group === g && i.type !== 'derived');
       if (!fields.length) return '';
+      if (g === 'ОСНОВНИ МЕРКИ') return basicGroupHtml(g);
       const done = new Set();
       return `<div class="ci-group"><h4>${esc(g)}</h4><div class="ci-grid">` + fields.map((inp) => {
         if (done.has(inp.key)) return '';
@@ -755,9 +853,9 @@
 
         const open = gateOpen(inp);
         const unit = inp.role === 'factor' ? '×' : (inp.unit || '');
-        return `<div class="field${inp.gate ? ' ci-gated' : ''}${open ? '' : ' off'}" data-gated-by="${esc(inp.gate || '')}">
+        return `<div class="field${inp.gate ? ' ci-gated' : ''}${open ? '' : ' off'}" data-field="${inp.key}" data-gated-by="${esc(inp.gate || '')}">
           <label>${esc(inp.label)}${unit ? `<span class="unit">${esc(unit)}</span>` : ''}</label>
-          <input type="number" step="any" data-key="${inp.key}" value="${calc.inputs[inp.key]}"${open ? '' : ' disabled'}></div>`;
+          <input type="number" step="any" min="0" data-key="${inp.key}" value="${calc.inputs[inp.key]}"${open ? '' : ' disabled'}></div>`;
       }).join('') + '</div></div>';
     }).join('');
 
@@ -771,11 +869,27 @@
     };
 
     host.querySelectorAll('input[data-key]').forEach((el) => {
-      el.oninput = () => { calc.inputs[el.dataset.key] = parseFloat(el.value) || 0; recalcAdmin(); };
+      markZero(el);
+      el.oninput = () => {
+        calc.inputs[el.dataset.key] = nonNeg(el);
+        markZero(el);
+        if (FLOOR_KEYS.includes(el.dataset.key)) sumFloors();
+        if (TERRACE_KEYS.includes(el.dataset.key)) syncTerrace();
+        recalcAdmin();
+      };
+    });
+    host.querySelectorAll('.seg-btn[data-ter]').forEach((b) => {
+      b.onclick = () => {
+        calc[b.dataset.terProp] = b.dataset.ter;
+        b.parentElement.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('on', x === b));
+        syncTerrace();
+        recalcAdmin();
+      };
     });
     host.querySelectorAll('.toggle[data-key]').forEach((el) => {
       el.onclick = () => {
         const k = el.dataset.key;
+        if (k === 'TWO_FLOORS') { setTwoFloors(!twoFloors()); renderCalcInputs(); recalcAdmin(); return; }
         calc.inputs[k] = calc.inputs[k] ? 0 : 1;
         el.classList.toggle('on', !!calc.inputs[k]);
         refreshGates();
@@ -796,6 +910,13 @@
     });
   }
 
+  // Чита број од поле во калкулаторот; негативна вредност ја враќа на 0 (и во самото поле)
+  function nonNeg(el) {
+    const v = parseFloat(el.value) || 0;
+    if (v < 0) { el.value = 0; return 0; }
+    return v;
+  }
+
   function renderCalcWindows() {
     const body = $('#cWinTable tbody');
     body.innerHTML = '';
@@ -803,13 +924,13 @@
       const tr = document.createElement('tr');
       tr.innerHTML = `<td class="mono muted">${i + 1}</td>
         <td><input type="text" value="${esc(w.name)}"></td>
-        <td class="num"><input type="number" step="any" style="width:70px;text-align:right;" value="${w.qty}"></td>
-        <td class="num"><input type="number" step="any" style="width:84px;text-align:right;" value="${w.priceEur}"></td>
+        <td class="num"><input type="number" step="any" min="0" style="width:70px;text-align:right;" value="${w.qty}"></td>
+        <td class="num"><input type="number" step="any" min="0" style="width:84px;text-align:right;" value="${w.priceEur}"></td>
         <td><button class="icon-btn del" title="Избриши">🗑</button></td>`;
       const [n, qi, p] = tr.querySelectorAll('input');
       n.oninput = (e) => { w.name = e.target.value; };
-      qi.oninput = (e) => { w.qty = parseFloat(e.target.value) || 0; recalcAdmin(); };
-      p.oninput = (e) => { w.priceEur = parseFloat(e.target.value) || 0; recalcAdmin(); };
+      qi.oninput = (e) => { w.qty = nonNeg(e.target); recalcAdmin(); };
+      p.oninput = (e) => { w.priceEur = nonNeg(e.target); recalcAdmin(); };
       tr.querySelector('.del').onclick = () => { calc.windows.splice(i, 1); renderCalcWindows(); recalcAdmin(); };
       body.appendChild(tr);
     });
@@ -861,8 +982,10 @@
     calc.discountEur = qt.discountEur || 0;
     calc.client = qt.client === 'Без име' ? '' : (qt.client || '');
     calc.date = qt.createdAt ? new Date(qt.createdAt).toLocaleDateString('mk-MK') : today();
-    calc.covered = 0;
-    calc.open = null;
+    calc.terraceType = 'open';
+    calc.terraceType2 = 'covered';
+    sumFloors();
+    syncTerrace();
     calc.outerH = 4.6;
     calc.loadedId = qt.id;
     document.querySelector('.tabs button[data-tab="calc"]').click();
@@ -878,10 +1001,10 @@
   $('#cAddWin').onclick = () => { calc.windows.push({ name: '', qty: 1, priceEur: 0 }); renderCalcWindows(); recalcAdmin(); };
   $('#cClient').oninput = (e) => { calc.client = e.target.value; };
   $('#cDate').oninput = (e) => { calc.date = e.target.value; };
-  $('#cDiscount').oninput = (e) => { calc.discountEur = parseFloat(e.target.value) || 0; recalcAdmin(); };
-  $('#cCovered').oninput = (e) => { calc.covered = parseFloat(e.target.value) || 0; recalcAdmin(); };
-  $('#cOpen').oninput = (e) => { calc.open = e.target.value === '' ? null : parseFloat(e.target.value) || 0; recalcAdmin(); };
-  $('#cOuterH').oninput = (e) => { calc.outerH = parseFloat(e.target.value) || 0; };
+  $('#cDiscount').oninput = (e) => { calc.discountEur = nonNeg(e.target); recalcAdmin(); };
+  $('#cCovered').oninput = (e) => { calc.covered = nonNeg(e.target); recalcAdmin(); };
+  $('#cOpen').oninput = (e) => { calc.open = nonNeg(e.target); recalcAdmin(); };
+  $('#cOuterH').oninput = (e) => { calc.outerH = nonNeg(e.target); };
 
   $('#cSaveQuote').onclick = async () => {
     const r = await fetch('/api/quotes', {

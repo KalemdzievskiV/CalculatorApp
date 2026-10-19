@@ -123,5 +123,24 @@ check('  коефициент — боја на прозори ×1.2', w2.price,
 check('  без галантерија — санитарии', qtyOf(run({ WC_SANITARY: 3, BEZ_GALANT: 1 }), 'V03'), 0);
 check('  без галантерија — електрика', qtyOf(run({ ELEKTRIKA: 1, EL_BEZ_GALANT: 1 }), 'E37'), 0);
 
+// Куќа на два ката
+console.log('\nДВА КАТА:');
+const one = run({});
+// Вклучено, но вториот кат е празен → исто како еднокатна
+const emptyF2 = run({ TWO_FLOORS: 1, AREA_F1: defaults.AREA_HOUSE, TERRACE_F1: defaults.AREA_TERRACE, FLOOR_H2: 0 });
+check('  празен втор кат = еднокатна (вкупно)', emptyF2.totalEur, one.totalEur);
+// Полињата по кат не влијаат кога TWO_FLOORS е исклучен
+check('  исклучено — полињата по кат се игнорираат', run({ AREA_F2: 80, WALL_OUT2: 40, FLOOR_H2: 3 }).totalEur, one.totalEur);
+const two = run({
+  TWO_FLOORS: 1, AREA_F1: 100, AREA_F2: 60, TERRACE_F1: 10, TERRACE_F2: 5,
+  FLOOR_H: 2.8, FLOOR_H2: 2.6, WALL_OUT: 40, WALL_OUT2: 30, WALL_IN: 20, WALL_IN2: 15,
+});
+check('  површина на куќа = прв + втор кат', two.vars.AREA_HOUSE, 160);
+check('  тераса = прв + втор кат', two.vars.AREA_TERRACE, 15);
+check('  површина надв. ѕидови по кат', two.vars.WALL_OUT_M2, 40 * 2.8 + 30 * 2.6);
+check('  површина внатр. ѕидови по кат', two.vars.WALL_IN_M2, 20 * 2.8 + 15 * 2.6);
+check('  вкупна висина', two.vars.HEIGHT, 5.4);
+check('  паропропустна фолија (Z02) ги брои двата ката', qtyOf(two, 'Z02'), (40 * 2.8 + 30 * 2.6 + two.vars.ROOF + 30) * two.vars.KAMENA);
+
 console.log(fail ? `\n${fail} ПРОВЕРКИ ПАДНАА` : '\nСИТЕ ПРОВЕРКИ ПОМИНАА ✓');
 process.exit(fail ? 1 : 0);

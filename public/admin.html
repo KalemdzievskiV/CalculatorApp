@@ -151,10 +151,10 @@
         <div class="card-body" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; align-items: end;">
           <div class="field"><label>Клиент</label><input type="text" id="cClient" placeholder="Име и презиме"></div>
           <div class="field"><label>Датум</label><input type="text" id="cDate"></div>
-          <div class="field"><label>Попуст (ЕУР)</label><input type="number" step="any" id="cDiscount" value="0"></div>
-          <div class="field"><label>Покриени тераси (m²)</label><input type="number" step="any" id="cCovered" value="0"></div>
-          <div class="field"><label>Откриени тераси (m²)</label><input type="number" step="any" id="cOpen"></div>
-          <div class="field"><label>Катна висина надв. (m)</label><input type="number" step="any" id="cOuterH" value="4.6"></div>
+          <div class="field"><label>Попуст (ЕУР)</label><input type="number" step="any" min="0" id="cDiscount" value="0"></div>
+          <div class="field"><label>Покриени тераси (m²)</label><input type="number" step="any" min="0" id="cCovered" value="0"></div>
+          <div class="field"><label>Откриени тераси (m²)</label><input type="number" step="any" min="0" id="cOpen"></div>
+          <div class="field"><label>Катна висина надв. (m)</label><input type="number" step="any" min="0" id="cOuterH" value="4.6"></div>
         </div>
       </div>
 

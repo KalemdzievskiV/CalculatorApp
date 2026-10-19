@@ -210,7 +210,13 @@
       if (inp.gate && !vars[inp.gate]) vars[inp.key] = 0;
     }
 
-    vars.WINDOWS_QTY = windows.reduce((s, w) => s + (Number(w.qty) || 0), 0);
+    // Куќа на два ката: површината на куќа и тераса е збир од двата ката.
+    if (vars.TWO_FLOORS && 'AREA_F1' in vars) {
+      vars.AREA_HOUSE = (vars.AREA_F1 || 0) + (vars.AREA_F2 || 0);
+      vars.AREA_TERRACE = (vars.TERRACE_F1 || 0) + (vars.TERRACE_F2 || 0);
+    }
+
+    vars.WINDOWS_QTY =windows.reduce((s, w) => s + (Number(w.qty) || 0), 0);
     // Изведени променливи (по редослед на дефинирање)
     for (const inp of db.inputs) {
       if (inp.type !== 'derived') continue;
