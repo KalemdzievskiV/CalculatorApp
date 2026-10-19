@@ -101,6 +101,7 @@
       ABRIB: s.fac === 'abrib' ? 1 : 0,
       FAS_LIM: s.fac === 'lim' ? r1(M('WALL_OUT') * M('FLOOR_H')) : 0,
       FAS_LIM_LENTI: s.fac === 'lim' ? r1(M('WALL_OUT')) : 0,
+      FAS_DRVO: s.fac === 'patos' ? 1 : 0,
       FAS_PATOS: s.fac === 'patos' ? r1(M('WALL_OUT') * M('FLOOR_H')) : 0,
       OKAPNICI: s.fac === 'patos' ? r1(M('WALL_OUT')) : 0,
       GIPS: s.interior === 'gypsum' ? 1 : 0,

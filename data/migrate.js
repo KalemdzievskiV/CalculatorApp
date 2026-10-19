@@ -11,7 +11,7 @@
  *  · Секоја промена се пријавува во конзола за да се види што се случило при подигање.
  */
 
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 // [код, стара фиксна количина, нова формула]
 const REWIRE_QTY = [
@@ -147,6 +147,28 @@ const MIGRATIONS = [
       }
       mat.formula = newF;
       log(code + ' → ' + newF);
+    }
+  },
+
+  /* 2 → 3: прекинувач „Фасада патос / дрво" — патосот и окапниците важат само кога е вклучен. */
+  function facadeWood(db, seed, log) {
+    if (!db.inputs.some((i) => i.key === 'FAS_DRVO')) {
+      const def = JSON.parse(JSON.stringify(seed.inputs.find((i) => i.key === 'FAS_DRVO')));
+      const at = db.inputs.findIndex((i) => i.key === 'FAS_PATOS');
+      db.inputs.splice(at >= 0 ? at : db.inputs.length, 0, def);
+      log('нов параметар: FAS_DRVO');
+    }
+    for (const key of ['FAS_PATOS', 'OKAPNICI']) {
+      const cur = db.inputs.find((i) => i.key === key);
+      if (!cur || cur.gate) continue;
+      cur.gate = 'FAS_DRVO';
+      cur.reveal = true;
+      log(key + ' → gate=FAS_DRVO');
+    }
+    // Зачувани понуди со патос → прекинувачот вклучен, за да не се изгуби патосот
+    for (const q of db.quotes || []) {
+      const i = q.inputs || {};
+      if (i.FAS_DRVO == null && (i.FAS_PATOS > 0 || i.OKAPNICI > 0)) { i.FAS_DRVO = 1; log('понуда ' + q.id + ' → FAS_DRVO=1'); }
     }
   },
 ];

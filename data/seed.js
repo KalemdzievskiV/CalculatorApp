@@ -56,8 +56,10 @@ const inputs = [
   { key: 'ABRIB',         label: 'Фасада абриб', type: 'boolean', def: 1, group: 'ФАСАДА' },
   { key: 'FAS_LIM',       label: 'Фасаден лим', unit: 'm²', type: 'number', def: 0, group: 'ФАСАДА' },
   { key: 'FAS_LIM_LENTI', label: 'Фасаден лим ленти', unit: 'm¹', type: 'number', def: 0, group: 'ФАСАДА' },
-  { key: 'FAS_PATOS',     label: 'Фасада патос', unit: 'm²', type: 'number', def: 0, group: 'ФАСАДА' },
-  { key: 'OKAPNICI',      label: 'Фасада патос ленти окапници', unit: 'm¹', type: 'number', def: 0, group: 'ФАСАДА' },
+  // reveal: условените полиња се прикажуваат дури кога прекинувачот е вклучен (инаку се скриени)
+  { key: 'FAS_DRVO',      label: 'Фасада патос / дрво', type: 'boolean', def: 0, group: 'ФАСАДА' },
+  { key: 'FAS_PATOS',     label: 'Фасада патос', unit: 'm²', type: 'number', def: 0, group: 'ФАСАДА', gate: 'FAS_DRVO', reveal: true },
+  { key: 'OKAPNICI',      label: 'Фасада патос ленти окапници', unit: 'm¹', type: 'number', def: 0, group: 'ФАСАДА', gate: 'FAS_DRVO', reveal: true },
   { key: 'PREMIUM_FAS',   label: 'Премиум фасада', type: 'boolean', def: 0, group: 'ФАСАДА' },
   { key: 'PREMIUM_FAS_M2', label: 'Количина премиум фасада', unit: 'm²', type: 'number', def: 0, group: 'ФАСАДА', gate: 'PREMIUM_FAS' },
 

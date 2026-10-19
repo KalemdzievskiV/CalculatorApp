@@ -190,6 +190,8 @@
     if (pf) it.priceFormula = pf;
     return it;
   }
+  // Копче Зачувај и горе во заглавјето — исто дејство како долното
+  $('#mSaveTop').onclick = () => $('#mSave').click();
   $('#mSave').onclick = async () => {
     const it = collectModal();
     if (!it.code || !it.name) return flash('Кодот и името се задолжителни');
@@ -865,7 +867,7 @@
 
         const open = gateOpen(inp);
         const unit = inp.role === 'factor' ? '×' : (inp.unit || '');
-        return `<div class="field${inp.gate ? ' ci-gated' : ''}${open ? '' : ' off'}" data-field="${inp.key}" data-gated-by="${esc(inp.gate || '')}">
+        return `<div class="field${inp.gate ? ' ci-gated' : ''}${inp.reveal ? ' ci-reveal' : ''}${open ? '' : ' off'}" data-field="${inp.key}" data-gated-by="${esc(inp.gate || '')}">
           <label>${esc(inp.label)}${unit ? `<span class="unit">${esc(unit)}</span>` : ''}</label>
           <input type="number" step="any" min="0" data-key="${inp.key}" value="${calc.inputs[inp.key]}"${open ? '' : ' disabled'}></div>`;
       }).join('') + '</div></div>';
