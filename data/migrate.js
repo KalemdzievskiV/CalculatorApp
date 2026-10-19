@@ -11,7 +11,7 @@
  *  · Секоја промена се пријавува во конзола за да се види што се случило при подигање.
  */
 
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
 
 // [код, стара фиксна количина, нова формула]
 const REWIRE_QTY = [
@@ -191,6 +191,22 @@ const MIGRATIONS = [
     for (const q of db.quotes || []) {
       const i = q.inputs || {};
       if (!i.FAS_DRVO && (i.FAS_LIM > 0 || i.FAS_LIM_LENTI > 0)) { i.FAS_DRVO = 1; log('понуда ' + q.id + ' → FAS_DRVO=1'); }
+    }
+  },
+
+  /* 4 → 5: посебна група WC меѓу ВНАТРЕШНОСТ и ЕЛЕКТРИКА. */
+  function wcGroup(db, seed, log) {
+    // Ако групата веќе постои (рачно додадена), само се преместува на вистинското место
+    const groups = db.inputGroups.filter((g) => g !== 'WC');
+    const after = groups.indexOf('ВНАТРЕШНОСТ');
+    groups.splice(after >= 0 ? after + 1 : groups.length, 0, 'WC');
+    db.inputGroups = groups;
+    log('група WC по ВНАТРЕШНОСТ');
+    for (const key of ['WC', 'WC_PERIM', 'WC_SANITARY', 'BEZ_GALANT']) {
+      const cur = db.inputs.find((i) => i.key === key);
+      if (!cur || cur.group !== 'ВНАТРЕШНОСТ') continue;
+      cur.group = 'WC';
+      log(key + ' → WC');
     }
   },
 ];

@@ -10,7 +10,7 @@ const settings = {
   phone: '071 336 108',
 };
 
-const inputGroups = ['ОСНОВНИ МЕРКИ', 'КОНСТРУКЦИЈА И СИСТЕМ', 'ФАСАДА', 'ВНАТРЕШНОСТ', 'ЕЛЕКТРИКА', 'КРОВ', 'ВРАТИ', 'ДОПОЛНИТЕЛНИ'];
+const inputGroups = ['ОСНОВНИ МЕРКИ', 'КОНСТРУКЦИЈА И СИСТЕМ', 'ФАСАДА', 'ВНАТРЕШНОСТ', 'WC', 'ЕЛЕКТРИКА', 'КРОВ', 'ВРАТИ', 'ДОПОЛНИТЕЛНИ'];
 
 /*
  * Дополнителни својства на влезните параметри (сите се опционални):
@@ -65,10 +65,10 @@ const inputs = [
 
   { key: 'GIPS',          label: 'Гипс картон внатре', type: 'boolean', def: 1, group: 'ВНАТРЕШНОСТ' },
   { key: 'CEILING',       label: 'Спуштен плафон', type: 'boolean', def: 1, group: 'ВНАТРЕШНОСТ' },
-  { key: 'WC',            label: 'Број на WC', unit: 'ком', type: 'number', def: 4, group: 'ВНАТРЕШНОСТ' },
-  { key: 'WC_PERIM',      label: 'Периметар WC', unit: 'm', type: 'number', def: 29, group: 'ВНАТРЕШНОСТ' },
-  { key: 'WC_SANITARY',   label: 'WC со санитарии', unit: 'ком', type: 'number', def: 0, group: 'ВНАТРЕШНОСТ' },
-  { key: 'BEZ_GALANT',    label: 'Без галантерија (санитарии)', type: 'boolean', def: 0, group: 'ВНАТРЕШНОСТ' },
+  { key: 'WC',            label: 'Број на WC', unit: 'ком', type: 'number', def: 4, group: 'WC' },
+  { key: 'WC_PERIM',      label: 'Периметар WC', unit: 'm', type: 'number', def: 29, group: 'WC' },
+  { key: 'WC_SANITARY',   label: 'WC со санитарии', unit: 'ком', type: 'number', def: 0, group: 'WC' },
+  { key: 'BEZ_GALANT',    label: 'Без галантерија (санитарии)', type: 'boolean', def: 0, group: 'WC' },
   { key: 'LAMINAT',       label: 'Под ламинат', type: 'boolean', def: 1, group: 'ВНАТРЕШНОСТ', exclusive: 'ПОД' },
   { key: 'PLOCHKI',       label: 'Под плочки (внатре)', type: 'boolean', def: 0, group: 'ВНАТРЕШНОСТ', exclusive: 'ПОД' },
   { key: 'TILE_EXTRA',    label: 'Додаток плочки надвор', unit: 'm²', type: 'number', def: 0, group: 'ВНАТРЕШНОСТ' },
