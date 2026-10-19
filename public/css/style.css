@@ -150,6 +150,9 @@ table.data .cat-row td { background: var(--panel); font-family: var(--disp); fon
 .pm-type .seg-btn { padding: 10px 6px; font-weight: 600; color: var(--ink); }
 .pm-type .seg-btn small { display: block; margin-top: 2px; font-weight: 400; font-size: 10.5px; color: var(--muted); }
 .pm-type .seg-btn.on small { color: rgba(255,255,255,.85); }
+.pm-type .seg-btn:disabled { opacity: .35; cursor: not-allowed; }
+.pm-type .seg-btn:disabled:hover { background: transparent; }
+#pKey:disabled { background: var(--panel); color: var(--ink-soft); }
 .pm-row { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 12px; align-items: start; }
 .pm-gate { display: grid; gap: 8px; }
 .pm-preview { font-size: 12.5px; color: var(--ink-soft); background: var(--panel); border: 1px solid var(--line); border-radius: 2px; padding: 10px 12px; line-height: 1.55; }

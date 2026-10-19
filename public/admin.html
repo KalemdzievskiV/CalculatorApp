@@ -339,7 +339,7 @@
 <!-- Модал за нов параметар -->
 <div class="modal-back" id="inpModal">
   <div class="modal" style="max-width: 580px;">
-    <div class="modal-head"><h3>Нов параметар</h3><button class="x-close" data-close>×</button></div>
+    <div class="modal-head"><h3 id="inpModalTitle">Нов параметар</h3><button class="x-close" data-close>×</button></div>
     <div class="modal-body">
       <div class="field pm-type">
         <label>Тип</label>
@@ -361,6 +361,12 @@
         <div class="hint" id="pKeyHint"></div>
       </div>
 
+      <div class="field pm-derived">
+        <label>Формула <span class="unit">изведен параметар — се пресметува од другите</span></label>
+        <textarea id="pFormula" class="formula-input" rows="2" spellcheck="false"></textarea>
+        <div class="hint" id="pFormulaCheck" style="margin-top: 5px;"></div>
+      </div>
+
       <div class="pm-row">
         <div class="field"><label>Група</label>
           <select id="pGroup"></select>
@@ -369,6 +375,8 @@
         <div class="field pm-num"><label>Ед. мера</label><input type="text" id="pUnit" placeholder="m², ком…"></div>
         <div class="field pm-num"><label>Стандардна вредност</label><input type="number" step="any" min="0" id="pDef" value="0"></div>
       </div>
+
+      <label class="toggle pm-bool" id="pDefOn"><span class="t-label">Стандардно вклучен</span><span class="knob"></span></label>
 
       <div class="field pm-bool">
         <label>Ексклузивна група <span class="unit">само еден прекинувач од групата смее да е вклучен</span></label>

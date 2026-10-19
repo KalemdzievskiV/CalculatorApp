@@ -289,12 +289,13 @@
         inp.target === 'windows' ? '<span class="tag" title="Се множи во цената на дограмата">дограма</span>' : ''}</td>
       <td class="num">${inp.type === 'derived' ? '<span class="mono" style="font-size:11px;">' + esc(inp.formula) + '</span>' : `<input type="number" step="any" value="${inp.def}" style="width:90px;text-align:right;font-family:var(--mono);font-size:12.5px;padding:4px 6px;border:1px solid var(--line);border-radius:2px;">`}</td>
       <td class="muted">${esc(inp.unit || '')}</td>
-      <td>${inp.type !== 'derived' ? '<button class="icon-btn del" title="Избриши">🗑</button>' : ''}</td>
+      <td style="white-space:nowrap;"><button class="icon-btn edit" title="Уреди">✎</button>${inp.type !== 'derived' ? '<button class="icon-btn del" title="Избриши">🗑</button>' : ''}</td>
     </tr>`).join('');
     body.querySelectorAll('tr').forEach((tr) => {
       const i = Number(tr.dataset.i);
       const numInput = tr.querySelector('input[type=number]');
       if (numInput) numInput.onchange = async (e) => { cfg.inputs[i].def = parseFloat(e.target.value) || 0; await save('inputs'); };
+      tr.querySelector('.edit').onclick = () => openInpModal(i);
       const del = tr.querySelector('.del');
       if (del) del.onclick = async () => {
         const key = cfg.inputs[i].key;
@@ -347,23 +348,39 @@
   const cleanKey = (k) => k.toUpperCase().replace(/[^A-Z0-9_]/g, '');
   const NEW = '__new__';
 
-  const pm = { type: 'number', keyTouched: false };
+  // editIdx: null = нов параметар, број = уредување на cfg.inputs[editIdx]
+  const pm = { type: 'number', keyTouched: false, editIdx: null };
+  const pmEditing = () => pm.editIdx != null;
+  const NUM_KINDS = ['number', 'price', 'factor'];
   const pmType = () => (pm.type === 'boolean' ? 'boolean' : 'number');
 
   function pmFill() {
     $('#pGroup').innerHTML = cfg.inputGroups.map((g) => `<option>${esc(g)}</option>`).join('') + `<option value="${NEW}">+ Нова група…</option>`;
     const excs = [...new Set(cfg.inputs.map((i) => i.exclusive).filter(Boolean))];
     $('#pExc').innerHTML = '<option value="">Без — независен прекинувач</option>' + excs.map((e) => `<option>${esc(e)}</option>`).join('') + `<option value="${NEW}">+ Нова ексклузивна група…</option>`;
-    $('#pGate').innerHTML = '<option value="">Секогаш</option>' + cfg.inputs.filter((i) => i.type === 'boolean')
+    const self = pmEditing() ? cfg.inputs[pm.editIdx].key : null;
+    $('#pGate').innerHTML = '<option value="">Секогаш</option>' + cfg.inputs.filter((i) => i.type === 'boolean' && i.key !== self)
       .map((i) => `<option value="${i.key}">${esc(i.label)} (${i.key})</option>`).join('');
   }
 
   // Прикажува само полињата што важат за избраниот тип + преглед и проверка на клучот
   function pmSync() {
     $('#pError').style.display = 'none';
-    const isBool = pm.type === 'boolean';
+    const isBool = pm.type === 'boolean', isDer = pm.type === 'derived';
     $$('#inpModal .pm-num').forEach((el) => { el.style.display = isBool ? 'none' : ''; });
     $$('#inpModal .pm-bool').forEach((el) => { el.style.display = isBool ? '' : 'none'; });
+    $$('#inpModal .pm-derived').forEach((el) => { el.style.display = isDer ? '' : 'none'; });
+    $('#inpModal .pm-type').style.display = isDer ? 'none' : '';
+    // Изведен: нема стандардна вредност ниту услов
+    $$('#inpModal .pm-gate').forEach((el) => { if (isDer) el.style.display = 'none'; });
+    $('#pDef').closest('.field').style.display = isBool || isDer ? 'none' : '';
+    if (isDer) {
+      const f = $('#pFormula').value.trim();
+      const vars = cfg.inputs.map((i) => i.key).concat('WINDOWS_QTY');
+      const e = f ? MDAEngine.validate(f, vars, null) : 'Внесете формула.';
+      $('#pFormulaCheck').textContent = e ? '✗ ' + e : '✓ Формулата е валидна';
+      $('#pFormulaCheck').style.color = e ? 'var(--accent)' : 'var(--ok, #3b7d3b)';
+    }
     $('#pGroupNew').style.display = $('#pGroup').value === NEW ? '' : 'none';
     $('#pExcNew').style.display = $('#pExc').value === NEW ? '' : 'none';
     $('#pReveal').style.display = $('#pGate').value ? '' : 'none';
@@ -371,12 +388,13 @@
     else $('#pUnit').placeholder = pm.type === 'factor' ? '×' : 'm², ком…';
 
     const key = cleanKey($('#pKey').value);
-    const taken = key && cfg.inputs.some((x) => x.key === key);
+    const taken = !pmEditing() && key && cfg.inputs.some((x) => x.key === key);
     $('#pKey').classList.toggle('bad', !!taken);
-    $('#pKeyHint').textContent = taken ? 'Овој клуч веќе постои — изберете друг.' : '';
+    $('#pKeyHint').textContent = taken ? 'Овој клуч веќе постои — изберете друг.'
+      : pmEditing() ? 'Клучот не може да се менува — се користи во формулите и во зачуваните понуди.' : '';
     $('#pKeyHint').style.color = taken ? 'var(--accent)' : '';
 
-    const label = $('#pLabel').value.trim() || 'Новиот параметар';
+    const label = $('#pLabel').value.trim() || (pmEditing() ? 'Параметарот' : 'Новиот параметар');
     const gate = $('#pGate').value;
     const gateInp = gate && cfg.inputs.find((i) => i.key === gate);
     const k = key ? `<code>${esc(key)}</code>` : 'клучот';
@@ -385,27 +403,52 @@
       boolean: `<b>${esc(label)}</b> ќе биде прекинувач (1 = вклучен, 0 = исклучен). Во формулите: <code>… * ${esc(key || 'KLUC')}</code> — ставката се наплаќа само кога е вклучен.`,
       price: `<b>${esc(label)}</b> ќе биде цена во денари по проект. Ставете ја во „Формула за цена" на материјал: ${k}.`,
       factor: `<b>${esc(label)}</b> ќе биде коефициент (стандардно 1). Пр. во „Формула за цена": <code>PRICE * ${esc(key || 'KLUC')}</code>.`,
+      derived: `<b>${esc(label)}</b> се пресметува автоматски од формулата. Во другите формули го користите како ${k}.`,
     }[pm.type];
     if (gateInp) txt += ` Важи само кога е вклучено „${esc(gateInp.label)}"${$('#pReveal').classList.contains('on') ? ', а дотогаш полето е скриено' : ''}.`;
     $('#pPreview').innerHTML = txt;
   }
 
-  function openInpModal() {
-    Object.assign(pm, { type: 'number', keyTouched: false });
+  function openInpModal(idx) {
+    const inp = typeof idx === 'number' ? cfg.inputs[idx] : null;
+    Object.assign(pm, { type: inp ? inpKind(inp) : 'number', keyTouched: !!inp, editIdx: inp ? idx : null });
     pmFill();
-    $$('#pType .seg-btn').forEach((b) => b.classList.toggle('on', b.dataset.t === 'number'));
-    ['#pLabel', '#pKey', '#pUnit', '#pGroupNew', '#pExcNew'].forEach((id) => { $(id).value = ''; });
+    $$('#pType .seg-btn').forEach((b) => {
+      b.classList.toggle('on', b.dataset.t === pm.type);
+      // При уредување: да/не останува да/не, број/цена/коефициент меѓусебно (прекинувачите се услови и ексклузивни групи)
+      b.disabled = !!inp && (pm.type === 'boolean') !== (b.dataset.t === 'boolean');
+    });
+    ['#pLabel', '#pKey', '#pUnit', '#pGroupNew', '#pExcNew', '#pFormula'].forEach((id) => { $(id).value = ''; });
     $('#pDef').value = 0;
     $('#pReveal').classList.remove('on');
+    $('#pDefOn').classList.remove('on');
+    $('#pKey').disabled = !!inp;
+    $('#inpModalTitle').textContent = inp ? 'Уреди параметар — ' + inp.key : 'Нов параметар';
+    $('#pSave').textContent = inp ? 'Зачувај' : 'Додади параметар';
+    if (inp) {
+      $('#pLabel').value = inp.label || '';
+      $('#pKey').value = inp.key;
+      $('#pGroup').value = cfg.inputGroups.includes(inp.group) ? inp.group : cfg.inputGroups[0];
+      $('#pUnit').value = inp.unit || '';
+      $('#pDef').value = inp.def ?? 0;
+      $('#pFormula').value = inp.formula || '';
+      $('#pDefOn').classList.toggle('on', !!inp.def);
+      $('#pExc').value = inp.exclusive || '';
+      $('#pGate').value = inp.gate || '';
+      $('#pReveal').classList.toggle('on', !!inp.reveal);
+    }
     $('#pError').style.display = 'none';
     pmSync();
     $('#inpModal').classList.add('open');
     $('#pLabel').focus();
   }
 
-  $('#addInput').onclick = openInpModal;
+  $('#addInput').onclick = () => openInpModal();
+  $('#pFormula').oninput = pmSync;
+  $('#pDefOn').onclick = () => { $('#pDefOn').classList.toggle('on'); };
   $$('#pType .seg-btn').forEach((b) => {
     b.onclick = () => {
+      if (b.disabled) return;
       pm.type = b.dataset.t;
       $$('#pType .seg-btn').forEach((x) => x.classList.toggle('on', x === b));
       const d = $('#pDef');
@@ -426,13 +469,20 @@
     if (!label) return err('Внесете име на параметарот.');
     if (!key) return err('Внесете клуч (латиница, бројки и _).');
     if (/^[0-9]/.test(key)) return err('Клучот не смее да почнува со бројка.');
-    if (cfg.inputs.some((x) => x.key === key)) return err('Клучот ' + key + ' веќе постои.');
+    if (!pmEditing() && cfg.inputs.some((x) => x.key === key)) return err('Клучот ' + key + ' веќе постои.');
     let group = $('#pGroup').value;
     if (group === NEW) group = $('#pGroupNew').value.trim();
     if (!group) return err('Внесете име на новата група.');
 
-    const inp = { key, label, group, type: pmType(), def: 0, unit: '' };
-    if (pm.type === 'boolean') {
+    const inp = { key, label, group, type: pm.type === 'derived' ? 'derived' : pmType(), def: 0, unit: '' };
+    if (pm.type === 'derived') {
+      inp.formula = $('#pFormula').value.trim();
+      const e = inp.formula ? MDAEngine.validate(inp.formula, cfg.inputs.map((i) => i.key).concat('WINDOWS_QTY'), null) : 'Внесете формула.';
+      if (e) return err('Формула: ' + e);
+      inp.unit = $('#pUnit').value.trim();
+      delete inp.def;
+    } else if (pm.type === 'boolean') {
+      inp.def = $('#pDefOn').classList.contains('on') ? 1 : 0;
       let exc = $('#pExc').value;
       if (exc === NEW) exc = $('#pExcNew').value.trim();
       if ($('#pExc').value === NEW && !exc) return err('Внесете име на ексклузивната група.');
@@ -450,7 +500,15 @@
     }
 
     if (!cfg.inputGroups.includes(group)) { cfg.inputGroups.push(group); await save('inputGroups'); }
-    cfg.inputs.push(inp);
+    if (pmEditing()) {
+      // Ги задржува другите својства (пр. target), а ги брише исчистените опции
+      const cur = cfg.inputs[pm.editIdx];
+      for (const k of ['exclusive', 'gate', 'reveal', 'role', 'unit']) delete cur[k];
+      if (inp.type === 'boolean') delete inp.unit;
+      Object.assign(cur, inp);
+    } else {
+      cfg.inputs.push(inp);
+    }
     await save('inputs');
     $('#inpModal').classList.remove('open');
     renderInputs();
