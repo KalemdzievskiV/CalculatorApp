@@ -701,6 +701,15 @@
     if (tot) tot.value = q(i.AREA_HOUSE);
   }
 
+  // Кај два ката меѓукатната конструкција е вклучена и има површина колку вториот кат
+  function syncMegukatna() {
+    if (!twoFloors()) return;
+    calc.inputs.MEGUKATNA = 1;
+    calc.inputs.MEGUKATNA_M2 = calc.inputs.AREA_F2 || 0;
+    const el = $('#cInputs input[data-key="MEGUKATNA_M2"]');
+    if (el) el.value = calc.inputs.MEGUKATNA_M2;
+  }
+
   // Вклучување/исклучување на втор кат: првиот кат ги презема/враќа досегашните вредности
   function setTwoFloors(on) {
     const i = calc.inputs;
@@ -711,8 +720,11 @@
       if (!(i.WALL_OUT2 > 0) && !(i.WALL_IN2 > 0)) i.FLOOR_H2 = i.FLOOR_H || 0;
       i.TWO_FLOORS = 1;
       sumFloors();
+      syncMegukatna();
     } else {
       i.TWO_FLOORS = 0;
+      i.MEGUKATNA = 0;
+      i.MEGUKATNA_M2 = 0;
       i.AREA_HOUSE = i.AREA_F1 || 0;
       i.AREA_TERRACE = i.TERRACE_F1 || 0;
     }
@@ -874,6 +886,7 @@
         calc.inputs[el.dataset.key] = nonNeg(el);
         markZero(el);
         if (FLOOR_KEYS.includes(el.dataset.key)) sumFloors();
+        if (el.dataset.key === 'AREA_F2') syncMegukatna();
         if (TERRACE_KEYS.includes(el.dataset.key)) syncTerrace();
         recalcAdmin();
       };
