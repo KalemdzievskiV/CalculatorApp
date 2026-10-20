@@ -366,7 +366,8 @@ const server = http.createServer(async (req, res) => {
     if (!full.startsWith(PUBLIC)) { res.writeHead(403); return res.end(); }
     fs.readFile(full, (err, data) => {
       if (err) { res.writeHead(404); return res.end('404'); }
-      res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream' });
+      // no-cache: прелистувачот секогаш проверува, за по ажурирање да не остане стар JS/CSS
+      res.writeHead(200, { 'Content-Type': MIME[path.extname(full)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
       res.end(data);
     });
   } catch (e) {

@@ -808,6 +808,7 @@
     $('#setPhone').value = cfg.settings.phone || '';
     $('#setVat').value = cfg.settings.vatPct;
     $('#setRate').value = cfg.settings.eurRate;
+    $('#setWinM2').value = cfg.settings.windowEurM2 || 150;
   }
   $('#saveSettings').onclick = async () => {
     const body = {
@@ -815,6 +816,7 @@
       phone: $('#setPhone').value,
       vatPct: parseFloat($('#setVat').value) || 18,
       eurRate: parseFloat($('#setRate').value) || 62,
+      windowEurM2: parseFloat($('#setWinM2').value) || 150,
     };
     const pw = $('#setPw').value.trim();
     if (pw) body.adminPassword = pw;
@@ -879,11 +881,15 @@
   const mkd0 = (v) => new Intl.NumberFormat('mk-MK', { maximumFractionDigits: 0 }).format(Math.round(v)) + ' ден';
   const q = (v) => new Intl.NumberFormat('mk-MK', { maximumFractionDigits: 2 }).format(v);
   const today = () => new Date().toLocaleDateString('mk-MK');
+  const r2 = (v) => Math.round(v * 100) / 100;
+
+  // Стандардната дограма е означена (def) за да ја замени дограмата од планот
+  const defaultWindows = () => (cfg.windowsDefaults || []).map((w) => Object.assign({}, w, { def: true }));
 
   function calcDefaults() {
     calc.inputs = {};
     cfg.inputs.forEach((i) => { if (i.type !== 'derived') calc.inputs[i.key] = i.def; });
-    calc.windows = JSON.parse(JSON.stringify(cfg.windowsDefaults || []));
+    calc.windows = defaultWindows();
     calc.discountEur = 0;
     calc.terraceType = 'open';
     calc.terraceType2 = 'covered';
@@ -1194,7 +1200,7 @@
     Object.assign(calc.inputs, qt.inputs || {});
     calc.windows = (qt.windows && qt.windows.length)
       ? JSON.parse(JSON.stringify(qt.windows))
-      : JSON.parse(JSON.stringify(cfg.windowsDefaults || []));
+      : defaultWindows();
     calc.discountEur = qt.discountEur || 0;
     calc.client = qt.client === 'Без име' ? '' : (qt.client || '');
     calc.date = qt.createdAt ? new Date(qt.createdAt).toLocaleDateString('mk-MK') : today();
@@ -1220,12 +1226,35 @@
   $('#cPlan').onclick = () => {
     const labels = {};
     cfg.inputs.forEach((i) => { labels[i.key] = i.label; });
-    MDAPlanner.open(calc.plan, { floors: twoFloors() ? 2 : 1, labels }, (patch, plan) => {
+    const heights = [calc.inputs.FLOOR_H, calc.inputs.FLOOR_H2];
+    MDAPlanner.open(calc.plan, { floors: twoFloors() ? 2 : 1, labels, heights, eurM2: cfg.settings.windowEurM2 || 150 }, (patch, plan, extra) => {
       calc.plan = plan;
       const done = [];
-      for (const [k, v] of Object.entries(patch)) if (inpOf(k)) { calc.inputs[k] = v; done.push(labels[k] || k); }
+      // Бројот на катови го одредува планот — прво тоа, бидејќи ги префрла површините
+      if ('TWO_FLOORS' in patch && !!patch.TWO_FLOORS !== twoFloors()) { setTwoFloors(!!patch.TWO_FLOORS); done.push(labels.TWO_FLOORS || 'TWO_FLOORS'); }
+      for (const [k, v] of Object.entries(patch)) if (k !== 'TWO_FLOORS' && inpOf(k)) { calc.inputs[k] = v; done.push(labels[k] || k); }
+      // Тераси: видот по кат е поголемиот дел, а покриени/откриени m² се точно од планот
+      const ter = extra && extra.terraces;
+      if (ter) ter.forEach((t, i) => { if (t.covered || t.open) calc[i ? 'terraceType2' : 'terraceType'] = t.covered >= t.open ? 'covered' : 'open'; });
       sumFloors();
+      syncMegukatna();
       syncTerrace();
+      if (ter) {
+        calc.covered = r2(ter.reduce((s, t) => s + t.covered, 0));
+        calc.open = r2(ter.reduce((s, t) => s + t.open, 0));
+        syncCalcFields();
+      }
+      // Дограма: редовите од планот ги заменуваат претходните од планот и стандардните
+      if (extra && extra.windows.length) {
+        calc.windows = calc.windows.filter((w) => !w.plan && !w.def).concat(extra.windows);
+        done.push('дограма');
+      } else if (calc.windows.some((w) => w.plan)) {
+        // Сите прозори се избришани од планот → назад кон стандардната дограма
+        calc.windows = calc.windows.filter((w) => !w.plan);
+        if (!calc.windows.length) calc.windows = defaultWindows();
+      }
+      renderCalcWindows();
+      if (extra && extra.outerH) { calc.outerH = extra.outerH; $('#cOuterH').value = calc.outerH; }
       renderCalcInputs();
       recalcAdmin();
       planBtn();
