@@ -81,6 +81,7 @@
       if (b.dataset.tab === 'quotes') renderQuotes();
       if (b.dataset.tab === 'inquiries') renderInquiries();
       if (b.dataset.tab === 'calc') renderCalc();
+      if (b.dataset.tab === 'explain') renderExplain();
       if (b.dataset.tab === 'analytics') renderAnalytics();
     };
   });
@@ -894,6 +895,7 @@
     calc.terraceType = 'open';
     calc.terraceType2 = 'covered';
     calc.plan = null;
+    calc.loaded = null;
     syncTerrace();
     calc.outerH = 4.6;
   }
@@ -952,22 +954,24 @@
     if (o) o.value = calc.open;
   }
 
-  // Вкупна површина со симсови = куќа + симсови + тераси (како во Excel: 166+11+12.41 = 189.41)
+  // Откриени тераси; површината со симсови е формулата AREA_SIMS (табот ПРЕСМЕТКА)
   const openTer = () => calc.open || 0;
-  const areaWithSims = () => (calc.inputs.AREA_HOUSE || 0) + (calc.inputs.SIMS || 0) + (calc.covered || 0) + openTer();
+
+  // Пресметка за тековниот калкулатор; терасите (покриени/откриени) влегуваат во површината со симсови
+  const computeCalc = (db = cfg) => MDAEngine.compute(db, { inputs: calc.inputs, windows: calc.windows, discountEur: calc.discountEur, covered: calc.covered || 0, open: openTer() });
 
   function recalcAdmin() {
-    calcRes = MDAEngine.compute(cfg, { inputs: calc.inputs, windows: calc.windows, discountEur: calc.discountEur });
-    const r = calcRes, aws = areaWithSims();
+    calcRes = computeCalc();
+    const r = calcRes;
     $('#cTotalEur').textContent = eur2(r.totalEur);
-    $('#cTotalMkd').textContent = mkd0(r.totalMkd);
+    $('#cTotalMkd').textContent = mkd0(r.totalEur * rate());
     $('#cTax').textContent = eur2(r.taxEur);
     $('#cPerM2').textContent = eur2(r.perM2);
     $('#cArea').textContent = q(r.area) + ' m²';
     $('#cGrey').textContent = eur2(r.greyEur);
-    $('#cGreyM2').textContent = eur2(aws ? r.greyEur / aws : 0);
+    $('#cGreyM2').textContent = eur2(r.greyPerM2);
     $('#cFinal').textContent = eur2(r.finalEur);
-    $('#cPerM2Sims').textContent = eur2(aws ? r.finalEur / aws : 0);
+    $('#cPerM2Sims').textContent = eur2(r.finalPerM2Sims);
 
     $('#cRecap').innerHTML = r.byCat.filter((c) => c.eur > 0.005)
       .map((c) => `<div class="c-cat"><span>${esc(c.name)}</span><b>${eur0(c.eur)}</b></div>`).join('');
@@ -1198,7 +1202,8 @@
     calc.inputs = {};
     cfg.inputs.forEach((i) => { if (i.type !== 'derived') calc.inputs[i.key] = i.def; });
     Object.assign(calc.inputs, qt.inputs || {});
-    calc.windows = (qt.windows && qt.windows.length)
+    // Понуда зачувана без прозори останува без прозори — инаку вчитаната цена не би се совпаднала со зачуваната
+    calc.windows = Array.isArray(qt.windows)
       ? JSON.parse(JSON.stringify(qt.windows))
       : defaultWindows();
     calc.discountEur = qt.discountEur || 0;
@@ -1211,6 +1216,7 @@
     syncTerrace();
     calc.outerH = 4.6;
     calc.loadedId = qt.id;
+    calc.loaded = { client: qt.client, createdAt: qt.createdAt, totalEur: Number(qt.totalEur) || 0 };
     document.querySelector('.tabs button[data-tab="calc"]').click();
     syncCalcFields();
     renderCalcInputs();
@@ -1277,8 +1283,193 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ client: calc.client.trim() || 'Без име', inputs: calc.inputs, windows: calc.windows, discountEur: calc.discountEur, totalEur: calcRes.totalEur, plan: calc.plan }),
     }).then((x) => x.json());
+    calc.loaded = { client: calc.client.trim() || 'Без име', createdAt: new Date().toISOString(), totalEur: calcRes.totalEur };
     $('#cNote').innerHTML = 'Зачувано ✓ <a href="index.html?quote=' + r.id + '" target="_blank">линк</a>';
   };
+
+  /* ── ПРЕСМЕТКА: формули за крајната цена и сивата фаза (уредливи) + објаснување ── */
+  const STEPS = MDAEngine.RESULT_STEPS;
+  let xDraft = null; // формули што се уредуваат (клуч → формула); null = нема незачувани измени
+
+  // Опис на променливите што смеат да се користат во формулите
+  const X_VARS = {
+    SUM_MKD: 'збир од сите ставки (количина × цена) + прозори, во денари',
+    SUM_EUR: 'истиот збир во евра (SUM_MKD ÷ RATE)',
+    GREY_SUM: 'збир од ЕУР на ставка × „Фактор сива фаза“',
+    WINDOWS_EUR: 'прозори и врати од дограмата, во евра',
+    RATE: 'курс ЕУР (Подесувања)',
+    VAT_PCT: 'ДДВ % (Подесувања)',
+    DISCOUNT: 'попуст внесен во калкулаторот, ЕУР',
+    AREA: 'вкупна површина (параметар AREA)',
+    AREA_HOUSE: 'површина на куќа',
+    AREA_TERRACE: 'површина на тераса',
+    SIMS: 'симс околу објект',
+    TERRACE_COVERED: 'покриени тераси (калкулатор)',
+    TERRACE_OPEN: 'откриени тераси (калкулатор)',
+  };
+
+  const draftCfg = () => Object.assign({}, cfg, { settings: Object.assign({}, cfg.settings, { resultFormulas: xFormulas() }) });
+  const xFormulas = () => xDraft || Object.assign({}, cfg.settings.resultFormulas || {});
+  const stepFormula = (s) => { const f = xFormulas()[s.key]; return f != null && String(f).trim() !== '' ? String(f) : s.def; };
+
+  // Проверка на формулата: смее да ги користи основните променливи и претходните чекори
+  function stepErrors(r) {
+    const base = Object.keys(r.resultVars).filter((k) => !STEPS.some((s) => s.key === k));
+    const errs = {};
+    STEPS.forEach((s, i) => {
+      const known = base.concat(STEPS.slice(0, i).map((x) => x.key));
+      const e = MDAEngine.validate(stepFormula(s), known, cfg.materials.map((m) => m.code));
+      // Повикување на подолен чекор (или самиот себе) — појасна порака од „непозната променлива“
+      if (e) errs[s.key] = e.replace(/Непозната променлива: (\w+)/g, (m, k) =>
+        STEPS.slice(i).some((x) => x.key === k) ? k + ' е на или под овој ред — може да се користат само горните чекори' : m);
+    });
+    return errs;
+  }
+
+  function renderExplain() {
+    const box = $('#xBody');
+    if (!Object.keys(calc.inputs).length) { calcDefaults(); calc.date = today(); }
+    const fmtStep = (s, val) => (s.unit === 'm²' ? q(val) + ' m²' : eur2(val));
+
+    box.innerHTML = `
+      <div class="card" style="margin-bottom: 16px; overflow-x: auto;">
+        <div class="card-head"><h3>Формули за крајната цена</h3>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="btn ghost small" id="xResetAll">↺ Сите стандардни</button>
+            <button class="btn ghost small" id="xCancel">Откажи</button>
+            <button class="btn accent small" id="xSave">Зачувај формули</button>
+          </div>
+        </div>
+        <div class="card-body" style="padding-bottom: 0;">
+          <p class="hint" style="margin: 0;">Секој ред е формула што се пресметува по ред — подолните редови можат да ги користат горните (пр. <span class="mono">TOTAL_EUR</span>). Измените важат за <b>сите</b> пресметки: јавниот калкулатор, админ калкулаторот и печатените понуди. Вредностите десно се за понудата што е моментално во калкулаторот${calc.client ? ' (' + esc(calc.client) + ')' : ''}.</p>
+          <div id="xState" class="hint" style="margin-top: 8px;"></div>
+        </div>
+        <table class="data" id="xSteps"><thead><tr><th>Чекор</th><th style="width: 55%;">Формула</th><th class="num">Вредност</th><th></th></tr></thead><tbody>
+          ${STEPS.map((s) => `<tr data-key="${s.key}">
+            <td><b>${esc(s.label)}</b><div class="mono muted" style="font-size: 11px;">${s.key}</div></td>
+            <td><input type="text" class="mono x-formula" data-key="${s.key}" value="${esc(stepFormula(s))}" spellcheck="false" style="width: 100%;">
+              <div class="x-err" data-err="${s.key}"></div></td>
+            <td class="num"><b data-val="${s.key}">—</b></td>
+            <td><button class="icon-btn x-reset" data-key="${s.key}" title="Врати стандардна: ${esc(s.def)}">↺</button></td>
+          </tr>`).join('')}
+        </tbody></table>
+        <div class="card-body">
+          <div class="hint" style="margin-bottom: 8px;">Достапни променливи (клик за вметнување во избраната формула). Може и <span class="mono">total("КОД")</span> / <span class="mono">qty("КОД")</span> за една ставка (во денари), <span class="mono">min max round ceil floor abs</span>, како и сите параметри од „Параметри“.</div>
+          <div id="xVars" class="x-vars"></div>
+        </div>
+      </div>
+      <div id="xRest"></div>`;
+
+    let lastInput = null;
+    const refresh = () => {
+      const r = MDAEngine.compute(draftCfg(), { inputs: calc.inputs, windows: calc.windows, discountEur: calc.discountEur, covered: calc.covered || 0, open: openTer() });
+      const errs = stepErrors(r);
+      STEPS.forEach((s) => {
+        $(`[data-val="${s.key}"]`).textContent = errs[s.key] ? '—' : fmtStep(s, r.results[s.key]);
+        $(`[data-err="${s.key}"]`).textContent = errs[s.key] || '';
+        const inp = $(`.x-formula[data-key="${s.key}"]`);
+        inp.classList.toggle('x-custom', stepFormula(s) !== s.def);
+        inp.classList.toggle('x-bad', !!errs[s.key]);
+      });
+      const nErr = Object.keys(errs).length;
+      const nCustom = STEPS.filter((s) => stepFormula(s) !== s.def).length;
+      $('#xState').innerHTML = (xDraft ? '<b style="color: var(--accent);">Незачувани измени</b> · ' : '') +
+        (nCustom ? nCustom + ' изменети формули (означени)' : 'Сите формули се стандардни') +
+        (nErr ? ` · <span style="color: #a13527;">${nErr} со грешка — не може да се зачува</span>` : '');
+      $('#xSave').disabled = !xDraft || nErr > 0;
+      $('#xCancel').disabled = !xDraft;
+      $('#xVars').innerHTML = Object.keys(X_VARS).concat(cfg.categories.map((c) => 'CAT_' + c.id))
+        .filter((k) => k in r.resultVars)
+        .map((k) => `<button class="x-var" data-ins="${esc(k)}" title="${esc(X_VARS[k] || 'категорија „' + ((cfg.categories.find((c) => 'CAT_' + c.id === k) || {}).name || '') + '“, ЕУР')}"><span class="mono">${esc(k)}</span> <span class="muted">${k === 'SUM_MKD' ? mkd0(r.resultVars[k]) : q(r.resultVars[k])}</span></button>`).join('');
+      $('#xVars').querySelectorAll('.x-var').forEach((b) => {
+        b.onclick = () => {
+          const inp = lastInput || $('.x-formula');
+          const at = inp.selectionStart != null ? inp.selectionStart : inp.value.length;
+          inp.value = inp.value.slice(0, at) + b.dataset.ins + inp.value.slice(inp.selectionEnd != null ? inp.selectionEnd : at);
+          inp.focus();
+          inp.setSelectionRange(at + b.dataset.ins.length, at + b.dataset.ins.length);
+          inp.dispatchEvent(new Event('input'));
+        };
+      });
+      renderExplainRest(r);
+    };
+    const setFormula = (key, val) => {
+      xDraft = xFormulas();
+      const s = STEPS.find((x) => x.key === key);
+      if (!val.trim() || val.trim() === s.def) delete xDraft[key];
+      else xDraft[key] = val;
+      refresh();
+    };
+
+    box.querySelectorAll('.x-formula').forEach((inp) => {
+      inp.onfocus = () => { lastInput = inp; };
+      inp.oninput = () => setFormula(inp.dataset.key, inp.value);
+    });
+    box.querySelectorAll('.x-reset').forEach((b) => {
+      b.onclick = () => {
+        const s = STEPS.find((x) => x.key === b.dataset.key);
+        $(`.x-formula[data-key="${s.key}"]`).value = s.def;
+        setFormula(s.key, s.def);
+      };
+    });
+    $('#xResetAll').onclick = () => {
+      STEPS.forEach((s) => { $(`.x-formula[data-key="${s.key}"]`).value = s.def; });
+      xDraft = {};
+      refresh();
+    };
+    $('#xCancel').onclick = () => { xDraft = null; renderExplain(); };
+    $('#xSave').onclick = async () => {
+      const resultFormulas = {};
+      STEPS.forEach((s) => { const f = stepFormula(s).trim(); if (f !== s.def) resultFormulas[s.key] = f; });
+      try { await api('/api/admin/settings', 'PUT', { resultFormulas }); }
+      catch (e) { if (e.message !== '401') flash('Грешка: ' + e.message); return; }
+      cfg.settings.resultFormulas = resultFormulas;
+      xDraft = null;
+      flash('Формулите се зачувани ✓');
+      recalcAdmin();
+      refresh();
+    };
+    refresh();
+  }
+
+  // Објаснување под формулите (зачувана vs. сегашна, сива фаза по ставки, категории) — се освежува при секоја измена
+  function renderExplainRest(r) {
+    const line = (label, how, val, cls = '') => `<tr class="${cls}"><td>${label}</td><td class="muted">${how}</td><td class="num"><b>${val}</b></td></tr>`;
+    const card = (title, inner, hint = '') => `<div class="card" style="margin-bottom: 16px; overflow-x: auto;"><div class="card-head"><h3>${title}</h3>${hint ? `<span class="hint">${hint}</span>` : ''}</div>${inner}</div>`;
+    let html = '';
+
+    if (calc.loaded) {
+      const diff = r.totalEur - calc.loaded.totalEur;
+      const same = Math.abs(diff) < 0.01;
+      html += card('Зачувана понуда наспроти сегашна пресметка', `<div class="card-body" style="display: grid; gap: 10px;">
+        <table class="data"><tbody>
+          ${line('Зачувано (во листата „Понуди“)', 'износ запишан во моментот на зачувување' + (calc.loaded.createdAt ? ' — ' + new Date(calc.loaded.createdAt).toLocaleString('mk-MK') : ''), eur2(calc.loaded.totalEur))}
+          ${line('Сега (во калкулаторот)', 'истите влезни мерки × денешните цени и формули', eur2(r.totalEur))}
+          ${line('Разлика', same ? 'се совпаѓа' : 'промена во ценовникот или формулите по зачувувањето', (diff > 0 ? '+' : '') + eur2(diff), same ? '' : 'x-diff')}
+        </tbody></table>
+        <div class="${same ? 'hint' : 'error-note'}">Понудата ги чува само <b>влезните мерки</b> (површини, ѕидови, прекинувачи, прозори, попуст) и <b>еден број</b> — вкупниот износ во тој момент. Цените и формулите не се чуваат во понудата. Кога понудата се отвора, калкулаторот повторно пресметува со <b>сегашниот</b> ценовник и формули, па ако нешто е сменето по зачувувањето, двата износа се разликуваат. Ако е потребна новата цена — зачувај ја понудата повторно.</div>
+      </div>`);
+    }
+
+    const greyRows = r.rows.filter((x) => x.grey && x.totalMkd > 0.005);
+    const catName = (id) => (cfg.categories.find((c) => c.id === id) || {}).name || id;
+    html += card('Сива фаза — ставки (GREY_SUM)', `<div class="card-body" style="padding-bottom: 0;"><p class="hint" style="margin: 0;">Секој материјал има „Фактор сива фаза“ (табот Материјали). <span class="mono">GREY_SUM</span> е збир од <b>ЕУР на ставката × факторот</b>: 0 = не влегува, 1 = целосно, 2 = двојно. Прозорите и вратите од дограмата влегуваат со фактор 1. Збир: <b>${eur2(r.resultVars.GREY_SUM)}</b> од ${greyRows.length} ставки.</p></div>
+      <table class="data"><thead><tr><th>Код</th><th>Материјал</th><th>Категорија</th><th class="num">ЕУР</th><th class="num">Фактор</th><th class="num">Во сива фаза</th></tr></thead><tbody>
+        ${greyRows.map((x) => `<tr><td class="mono muted">${x.code || '—'}</td><td>${esc(x.name)}</td><td class="muted">${esc(catName(x.cat))}</td>
+          <td class="num">${eur2(x.eur)}</td><td class="num">${x.grey === 1 ? '×1' : `<b class="x-flag">×${q(x.grey)}</b>`}</td><td class="num">${eur2(x.eur * x.grey)}</td></tr>`).join('')}
+      </tbody></table>`);
+
+    const cats = cfg.categories.map((c) => {
+      const rs = r.rows.filter((x) => x.cat === c.id);
+      return { id: c.id, name: c.name, eur: rs.reduce((s, x) => s + x.eur, 0), grey: rs.reduce((s, x) => s + x.eur * (x.grey || 0), 0) };
+    }).filter((c) => c.eur > 0.005);
+    html += card('Вкупно по категории (SUM_EUR)', `<table class="data"><thead><tr><th>Категорија</th><th>Променлива</th><th class="num">Вкупно ЕУР</th><th class="num">Од тоа сива фаза</th></tr></thead><tbody>
+      ${cats.map((c) => `<tr><td>${esc(c.name)}</td><td class="mono muted">CAT_${esc(c.id)}</td><td class="num">${eur2(c.eur)}</td><td class="num">${eur2(c.grey)}</td></tr>`).join('')}
+      <tr class="cat-row"><td>ВКУПНО</td><td></td><td class="num">${eur2(r.resultVars.SUM_EUR)}</td><td class="num">${eur2(r.resultVars.GREY_SUM)}</td></tr>
+    </tbody></table>`, 'деталите по ставка се во „Калкулатор“ → Детална спецификација');
+
+    $('#xRest').innerHTML = html;
+  }
 
   /* ── Генератор на ПОНУДА (клуч на рака / сива фаза) ── */
   // Пресметана количина за spec со `codes` (собира qty од моторот)
@@ -1323,12 +1514,11 @@
     const r = calcRes;
     const isGrey = variant === 'grey';
     // Сива фаза ја користи greyEur; клуч на рака го користи вкупниот износ
-    const baseEur = isGrey ? r.greyEur : r.totalEur;
-    const discount = isGrey ? 0 : r.discountEur;
-    const finalEur = baseEur - discount;
+    // (формулите се уредуваат во табот ПРЕСМЕТКА)
+    const finalEur = isGrey ? r.greyEur : r.finalEur;
     const finalMkd = finalEur * rate();
-    const aws = areaWithSims();
-    const perM2 = aws ? finalEur / aws : 0;
+    const aws = r.areaSims;
+    const perM2 = isGrey ? r.greyPerM2 : r.finalPerM2Sims;
     const date = calc.date || today();
     const client = calc.client.trim() || '—';
 

@@ -313,28 +313,71 @@
       totalMkd += r.totalMkd;
       greyEur += r.eur * (r.grey || 0);
     }
-    const totalEur = totalMkd / rate;
     const discountEur = Number(state.discountEur) || 0;
-    const finalEur = totalEur - discountEur;
     const area = vars.AREA || (vars.AREA_HOUSE + vars.AREA_TERRACE) || 1;
+
+    // Крајни бројки: секој чекор е формула (уредлива во админ → ПРЕСМЕТКА, settings.resultFormulas).
+    // Чекорите се пресметуваат по ред и секој може да ги користи претходните.
+    const covered = Number(state.covered) || 0;
+    const rvars = Object.assign({}, vars, {
+      SUM_MKD: totalMkd, SUM_EUR: totalMkd / rate, GREY_SUM: greyEur,
+      WINDOWS_EUR: rows.reduce((s, r) => s + (r.isWindow ? r.eur : 0), 0),
+      RATE: rate, VAT_PCT: (vat - 1) * 100, DISCOUNT: discountEur, AREA: area,
+      TERRACE_COVERED: covered,
+      TERRACE_OPEN: state.open != null ? Number(state.open) || 0 : Math.max(0, (vars.AREA_TERRACE || 0) - covered),
+    });
+    for (const c of db.categories) rvars['CAT_' + c.id] = byCat[c.id].eur;
+    const custom = (db.settings && db.settings.resultFormulas) || {};
+    const results = {}, resultSteps = [];
+    for (const step of RESULT_STEPS) {
+      const own = custom[step.key] != null && String(custom[step.key]).trim() !== '';
+      const formula = own ? String(custom[step.key]) : step.def;
+      let val;
+      try { val = evalAst(parse(formula), { vars: rvars, qty: qtyOf, total: totalOf }); }
+      catch (e) {
+        errors.push('Формула „' + step.label + '“: ' + e.message + ' — се користи стандардната.');
+        val = evalAst(parse(step.def), { vars: rvars, qty: qtyOf, total: totalOf });
+      }
+      if (!isFinite(val)) val = 0;
+      rvars[step.key] = results[step.key] = val;
+      resultSteps.push({ key: step.key, label: step.label, formula, def: step.def, custom: own && formula !== step.def, value: val });
+    }
 
     return {
       rows,
       byCat: db.categories.map((c) => byCat[c.id]),
       totalMkd,
-      totalEur,
-      taxEur: totalEur - totalEur / vat,
-      perM2: totalEur / area,
-      greyEur,
-      greyPerM2: greyEur / area,
+      totalEur: results.TOTAL_EUR,
+      taxEur: results.TAX_EUR,
+      perM2: results.PER_M2,
+      greyEur: results.GREY_EUR,
+      greyPerM2: results.GREY_PER_M2,
       discountEur,
-      finalEur,
-      finalPerM2: finalEur / area,
+      finalEur: results.FINAL_EUR,
+      finalPerM2: results.FINAL_PER_M2,
+      finalPerM2Sims: results.FINAL_PER_M2_SIMS,
+      areaSims: results.AREA_SIMS,
       area,
       vars,
+      results,
+      resultSteps,
+      resultVars: rvars,
       errors,
     };
   }
 
-  return { tokenize, parse, validate, compute };
+  // Чекори на крајната пресметка. `def` е стандардната формула (истата како пред да стане уредлива).
+  const RESULT_STEPS = [
+    { key: 'AREA_SIMS', label: 'Површина со симсови', unit: 'm²', def: 'AREA_HOUSE + SIMS + TERRACE_COVERED + TERRACE_OPEN' },
+    { key: 'TOTAL_EUR', label: 'ВКУПНО (со ДДВ)', unit: '€', def: 'SUM_MKD / RATE' },
+    { key: 'TAX_EUR', label: 'ДДВ (издвоен)', unit: '€', def: 'TOTAL_EUR - TOTAL_EUR / (1 + VAT_PCT / 100)' },
+    { key: 'PER_M2', label: 'Цена по m²', unit: '€', def: 'TOTAL_EUR / AREA' },
+    { key: 'GREY_EUR', label: 'СИВА ФАЗА', unit: '€', def: 'GREY_SUM' },
+    { key: 'GREY_PER_M2', label: 'Сива фаза по m²', unit: '€', def: 'GREY_EUR / AREA_SIMS' },
+    { key: 'FINAL_EUR', label: 'Цена со попуст', unit: '€', def: 'TOTAL_EUR - DISCOUNT' },
+    { key: 'FINAL_PER_M2', label: 'Цена по m² со попуст (јавен калкулатор)', unit: '€', def: 'FINAL_EUR / AREA' },
+    { key: 'FINAL_PER_M2_SIMS', label: 'Цена/m² со симсови', unit: '€', def: 'FINAL_EUR / AREA_SIMS' },
+  ];
+
+  return { tokenize, parse, validate, compute, RESULT_STEPS };
 });

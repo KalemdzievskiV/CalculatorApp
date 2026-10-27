@@ -651,3 +651,17 @@ body.notice-closed .nav-hero { top: 0; }
   .pl-modal .modal-foot { flex-wrap: wrap; }
   .pl-hint { flex-basis: 100%; }
 }
+
+/* ── Админ: таб ПРЕСМЕТКА ── */
+#tab-explain table.data td:first-child { white-space: nowrap; }
+#tab-explain tr.x-strong td { font-weight: 600; }
+#tab-explain tr.x-strong td.num b { color: var(--accent); }
+#tab-explain tr.x-diff td.num b { color: #a13527; }
+#tab-explain .x-flag { color: #a13527; }
+#tab-explain .x-formula.x-custom { border-color: var(--accent); background: #fdf6f4; }
+#tab-explain .x-err { color: #a13527; font-size: 11.5px; margin-top: 3px; }
+#tab-explain .x-err:empty { display: none; }
+#tab-explain .x-vars { display: flex; flex-wrap: wrap; gap: 6px; }
+#tab-explain .x-var { border: 1px solid var(--line); background: var(--panel); border-radius: 2px; padding: 4px 8px; font-size: 11.5px; cursor: pointer; }
+#tab-explain .x-var:hover { border-color: var(--accent); }
+#tab-explain .x-formula.x-bad { border-color: #a13527; color: #a13527; }
