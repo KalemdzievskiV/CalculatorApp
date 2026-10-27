@@ -680,6 +680,10 @@ body.notice-closed .nav-hero { top: 0; }
 .os-sec .os-items label { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; font-size: 12.5px; cursor: pointer; }
 .os-sec input[type="checkbox"] { width: auto; margin-top: 2px; flex: none; }
 .os-sec .os-items label.os-custom span { color: var(--accent); }
-.os-sec .os-del { margin-left: auto; }
+.os-sec .os-tools { margin-left: auto; display: flex; gap: 2px; flex: none; opacity: .35; }
+.os-sec .os-items label:hover .os-tools { opacity: 1; }
+.os-sec .os-tools .icon-btn { padding: 0 5px; font-size: 12px; line-height: 20px; }
+.os-sec .os-tools .icon-btn:disabled { visibility: hidden; }
+.os-sec .os-restore { justify-self: start; margin-top: 6px; background: none; border: none; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; }
 .os-sec .os-add { display: flex; gap: 8px; margin-top: 6px; }
 .os-sec .os-add input { flex: 1; font-size: 12.5px; padding: 6px 8px; }

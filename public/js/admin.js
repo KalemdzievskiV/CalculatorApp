@@ -896,10 +896,20 @@
     calc.terraceType2 = 'covered';
     calc.plan = null;
     calc.loaded = null;
-    calc.offerExclude = { turnkey: {}, grey: {} };
-    calc.offerExtra = { turnkey: {}, grey: {} };
+    resetOfferSel();
     syncTerrace();
     calc.outerH = 4.6;
+  }
+
+  // Избор на елементи во печатената понуда (по варијанта): исклучени, додадени, избришани и редослед.
+  // Без понуда → сè стандардно; со понуда → се презема зачуваното.
+  const OFFER_SEL_KEYS = ['offerExclude', 'offerExtra', 'offerDeleted', 'offerOrder'];
+  function resetOfferSel(qt) {
+    OFFER_SEL_KEYS.forEach((k) => {
+      calc[k] = { turnkey: {}, grey: {} };
+      const src = qt && qt[k];
+      if (src) ['turnkey', 'grey'].forEach((v) => Object.assign(calc[k][v], JSON.parse(JSON.stringify(src[v] || {}))));
+    });
   }
 
   // Куќа на два ката: површината на куќа и тераса е збир од двата ката (исто како во моторот)
@@ -1214,12 +1224,7 @@
     calc.terraceType = 'open';
     calc.terraceType2 = 'covered';
     calc.plan = qt.plan || null;
-    calc.offerExclude = { turnkey: {}, grey: {} };
-    calc.offerExtra = { turnkey: {}, grey: {} };
-    ['turnkey', 'grey'].forEach((v) => {
-      Object.assign(calc.offerExclude[v], (qt.offerExclude || {})[v] || {});
-      Object.assign(calc.offerExtra[v], JSON.parse(JSON.stringify((qt.offerExtra || {})[v] || {})));
-    });
+    resetOfferSel(qt);
     sumFloors();
     syncTerrace();
     calc.outerH = 4.6;
@@ -1289,7 +1294,7 @@
   $('#cSaveQuote').onclick = async () => {
     const r = await fetch('/api/quotes', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client: calc.client.trim() || 'Без име', inputs: calc.inputs, windows: calc.windows, discountEur: calc.discountEur, totalEur: calcRes.totalEur, plan: calc.plan, offerExclude: calc.offerExclude, offerExtra: calc.offerExtra }),
+      body: JSON.stringify({ client: calc.client.trim() || 'Без име', inputs: calc.inputs, windows: calc.windows, discountEur: calc.discountEur, totalEur: calcRes.totalEur, plan: calc.plan, offerExclude: calc.offerExclude, offerExtra: calc.offerExtra, offerDeleted: calc.offerDeleted, offerOrder: calc.offerOrder }),
     }).then((x) => x.json());
     calc.loaded = { client: calc.client.trim() || 'Без име', createdAt: new Date().toISOString(), totalEur: calcRes.totalEur };
     $('#cNote').innerHTML = 'Зачувано ✓ <a href="index.html?quote=' + r.id + '" target="_blank">линк</a>';
@@ -1501,12 +1506,26 @@
     const v = calc.offerExtra[variant] || (calc.offerExtra[variant] = {});
     return v[`s${si}`] || (v[`s${si}`] = []);
   };
-  const offerParts = (s, si, variant) => [
+  const offerSub = (key, variant) => {
+    if (!calc[key]) calc[key] = emptySel();
+    return calc[key][variant] || (calc[key][variant] = {});
+  };
+  const offerDeleted = (variant) => offerSub('offerDeleted', variant);
+  const offerOrder = (variant, si) => offerSub('offerOrder', variant)[`s${si}`] || [];
+  // Сите редови во секцијата од шаблонот + додадените (вклучително избришаните)
+  const offerPartsRaw = (s, si, variant) => [
     ...s.items.map((x, j) => ({ id: `s${si}i${j}`, kind: 'item', x })),
     ...offerExtra(variant, si).map((x) => ({ id: `s${si}c${x.id}`, kind: 'item', x, custom: true })),
     ...s.specs.map((x, j) => ({ id: `s${si}p${j}`, kind: 'spec', x })),
     ...s.notes.map((x, j) => ({ id: `s${si}n${j}`, kind: 'note', x })),
   ];
+  // Видливите редови по зададениот редослед (новите/неподредените одат на крај по стандардниот ред)
+  const offerParts = (s, si, variant) => {
+    const del = offerDeleted(variant), order = offerOrder(variant, si);
+    const rank = (p, i) => { const k = order.indexOf(p.id); return k >= 0 ? k : 10000 + i; };
+    return offerPartsRaw(s, si, variant).map((p, i) => [p, rank(p, i)])
+      .filter(([p]) => !del[p.id]).sort((a, b) => a[1] - b[1]).map(([p]) => p);
+  };
 
   function offerSection(s, si, variant) {
     const ex = offerEx(variant);
@@ -1547,11 +1566,20 @@
       const label = (p) => p.kind === 'item' ? esc(p.x.text) + (p.x.value ? ` — <b>${esc(p.x.value)}</b>` : '')
         : p.kind === 'spec' ? `${esc(p.x.label)} <span class="mono muted">${esc(specVal(p.x))}</span>`
         : `<i class="muted">${esc(p.x)}</i>`;
+      const nDel = offerPartsRaw(s, si, osVariant).filter((p) => !p.custom && offerDeleted(osVariant)[p.id]).length;
+      // Стрелките се активни само ако има сосед од ист вид (ставка / количина / забелешка)
+      const canMove = (i, dir) => { for (let k = i + dir; k >= 0 && k < parts.length; k += dir) if (parts[k].kind === parts[i].kind) return true; return false; };
       return `<div class="os-sec${osOpen.has(si) ? ' open' : ''}" data-sec="s${si}" data-si="${si}">
         <div class="os-head"><span class="os-chev">▸</span><input type="checkbox" data-id="s${si}"><span class="os-title">${esc(s.title)}</span><span class="muted os-n"></span></div>
         <div class="os-items">
-          ${parts.map((p) => `<label class="${p.custom ? 'os-custom' : ''}"><input type="checkbox" data-id="${p.id}"> <span>${label(p)}</span>${p.custom ? `<button class="icon-btn os-del" data-del="${p.x.id}" title="Избриши го додадениот елемент">×</button>` : ''}</label>`).join('')}
+          ${parts.map((p, i) => `<label class="${p.custom ? 'os-custom' : ''}"><input type="checkbox" data-id="${p.id}"> <span>${label(p)}</span>
+            <span class="os-tools">
+              <button class="icon-btn" data-move="-1" data-pid="${p.id}" title="Помести горе"${canMove(i, -1) ? '' : ' disabled'}>↑</button>
+              <button class="icon-btn" data-move="1" data-pid="${p.id}" title="Помести долу"${canMove(i, 1) ? '' : ' disabled'}>↓</button>
+              <button class="icon-btn" data-del="${p.id}" title="Избриши">✕</button>
+            </span></label>`).join('')}
           <div class="os-add"><input type="text" placeholder="Нов елемент во „${esc(s.title)}“…" data-add="${si}"><button class="btn ghost small" data-addbtn="${si}">+ Додај</button></div>
+          ${nDel ? `<button class="os-restore" data-restore="${si}">↺ Врати ${nDel} избришан${nDel === 1 ? '' : 'и'} стандарден${nDel === 1 ? '' : 'и'} елемент${nDel === 1 ? '' : 'и'}</button>` : ''}
         </div>
       </div>`;
     }).join('');
@@ -1594,14 +1622,51 @@
     body.querySelectorAll('input[data-add]').forEach((inp) => {
       inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); add(+inp.dataset.add); } };
     });
+    const secOf = (b) => +b.closest('.os-sec').dataset.si;
+    // Бришење: додадениот елемент се отстранува целосно; стандардниот се крие (може да се врати)
     body.querySelectorAll('[data-del]').forEach((b) => {
       b.onclick = (e) => {
         e.preventDefault();
-        const si = +b.closest('.os-sec').dataset.si;
-        const list = offerExtra(osVariant, si);
-        list.splice(list.findIndex((x) => x.id === b.dataset.del), 1);
-        delete ex[`s${si}c${b.dataset.del}`];
-        renderOfferSel(si);
+        const si = secOf(b), id = b.dataset.del;
+        const custom = id.match(/^s\d+c(.+)$/);
+        if (custom) {
+          const list = offerExtra(osVariant, si);
+          list.splice(list.findIndex((x) => x.id === custom[1]), 1);
+          const ord = offerSub('offerOrder', osVariant);
+          if (ord[`s${si}`]) ord[`s${si}`] = ord[`s${si}`].filter((x) => x !== id);
+        } else {
+          // Стандардниот останува во редоследот — при враќање се појавува на истото место
+          offerDeleted(osVariant)[id] = true;
+        }
+        delete ex[id];
+        renderOfferSel();
+      };
+    });
+    body.querySelectorAll('[data-restore]').forEach((b) => {
+      b.onclick = () => {
+        const si = +b.dataset.restore, del = offerDeleted(osVariant);
+        Object.keys(del).forEach((k) => { if (new RegExp(`^s${si}[ipn]`).test(k)) delete del[k]; });
+        renderOfferSel();
+      };
+    });
+    // Поместување горе/долу — се заменува со најблискиот ред од ист вид; редоследот се памети за секцијата
+    body.querySelectorAll('[data-move]').forEach((b) => {
+      b.onclick = (e) => {
+        e.preventDefault();
+        const si = secOf(b), dir = +b.dataset.move;
+        const ids = offerParts(t.sections[si], si, osVariant);
+        const i = ids.findIndex((p) => p.id === b.dataset.pid);
+        let k = i + dir;
+        while (k >= 0 && k < ids.length && ids[k].kind !== ids[i].kind) k += dir;
+        if (k < 0 || k >= ids.length) return;
+        // Редоследот ги опфаќа и избришаните стандардни, за да се вратат на своето место
+        const order = offerOrder(osVariant, si);
+        const full = offerPartsRaw(t.sections[si], si, osVariant).map((p, j) => [p.id, order.indexOf(p.id) >= 0 ? order.indexOf(p.id) : 10000 + j])
+          .sort((a, b) => a[1] - b[1]).map(([pid]) => pid);
+        const a = full.indexOf(ids[i].id), c = full.indexOf(ids[k].id);
+        [full[a], full[c]] = [full[c], full[a]];
+        offerSub('offerOrder', osVariant)[`s${si}`] = full;
+        renderOfferSel();
       };
     });
     syncOfferSel();

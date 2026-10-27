@@ -258,6 +258,22 @@ const server = http.createServer(async (req, res) => {
         };
         quote.offerExtra = { turnkey: clean(body.offerExtra.turnkey), grey: clean(body.offerExtra.grey) };
       }
+      // Избришани стандардни елементи и редослед по секција, пр. { turnkey: { s3i1: true } } / { turnkey: { s3: ['s3i2', 's3i0'] } }
+      const partId = /^s\d+([ipn]\d+|c[a-z0-9]{1,20})$/;
+      if (body.offerDeleted && typeof body.offerDeleted === 'object') {
+        const clean = (m) => Object.fromEntries(Object.keys(m && typeof m === 'object' ? m : {}).filter((k) => partId.test(k)).slice(0, 2000).map((k) => [k, true]));
+        quote.offerDeleted = { turnkey: clean(body.offerDeleted.turnkey), grey: clean(body.offerDeleted.grey) };
+      }
+      if (body.offerOrder && typeof body.offerOrder === 'object') {
+        const clean = (m) => {
+          const out = {};
+          for (const k of Object.keys(m && typeof m === 'object' ? m : {})) {
+            if (/^s\d+$/.test(k) && Array.isArray(m[k])) out[k] = m[k].filter((x) => typeof x === 'string' && partId.test(x)).slice(0, 200);
+          }
+          return out;
+        };
+        quote.offerOrder = { turnkey: clean(body.offerOrder.turnkey), grey: clean(body.offerOrder.grey) };
+      }
       db.quotes = db.quotes || [];
       db.quotes.unshift(quote);
       saveDb();
