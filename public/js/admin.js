@@ -1515,6 +1515,8 @@
     const isGrey = variant === 'grey';
     // Сива фаза ја користи greyEur; клуч на рака го користи вкупниот износ
     // (формулите се уредуваат во табот ПРЕСМЕТКА)
+    const baseEur = isGrey ? r.greyEur : r.totalEur; // редовна цена (пред попуст)
+    const discount = isGrey ? 0 : r.discountEur;
     const finalEur = isGrey ? r.greyEur : r.finalEur;
     const finalMkd = finalEur * rate();
     const aws = r.areaSims;
