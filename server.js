@@ -239,6 +239,25 @@ const server = http.createServer(async (req, res) => {
       };
       // Цртеж на основата (админ калкулатор) — се чува за подоцнежно уредување
       if (body.plan && typeof body.plan === 'object' && Array.isArray(body.plan.floors) && JSON.stringify(body.plan).length < 300000) quote.plan = body.plan;
+      // Исклучени елементи од печатената понуда (клуч на рака / сива фаза), пр. { turnkey: { s3i1: true } }
+      if (body.offerExclude && typeof body.offerExclude === 'object') {
+        const clean = (m) => Object.fromEntries(Object.keys(m && typeof m === 'object' ? m : {}).filter((k) => /^s\d+([ipn]\d+|c[a-z0-9]{1,20})?$/.test(k)).slice(0, 2000).map((k) => [k, true]));
+        quote.offerExclude = { turnkey: clean(body.offerExclude.turnkey), grey: clean(body.offerExclude.grey) };
+      }
+      // Рачно додадени елементи по секција, пр. { turnkey: { s3: [{ id, text }] } }
+      if (body.offerExtra && typeof body.offerExtra === 'object') {
+        const clean = (m) => {
+          const out = {};
+          for (const k of Object.keys(m && typeof m === 'object' ? m : {})) {
+            if (!/^s\d+$/.test(k) || !Array.isArray(m[k])) continue;
+            const list = m[k].filter((x) => x && /^[a-z0-9]{1,20}$/.test(x.id) && String(x.text || '').trim())
+              .slice(0, 100).map((x) => ({ id: x.id, text: String(x.text).trim().slice(0, 300) }));
+            if (list.length) out[k] = list;
+          }
+          return out;
+        };
+        quote.offerExtra = { turnkey: clean(body.offerExtra.turnkey), grey: clean(body.offerExtra.grey) };
+      }
       db.quotes = db.quotes || [];
       db.quotes.unshift(quote);
       saveDb();

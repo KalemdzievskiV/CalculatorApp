@@ -223,6 +223,10 @@
             <div class="card-body" style="display: grid; gap: 10px;">
               <button class="btn accent" id="cOfferTurnkey">🖨 ПОНУДА — КЛУЧ НА РАКА</button>
               <button class="btn ghost" id="cOfferGrey">🖨 ПОНУДА — СИВА ФАЗА</button>
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <button class="btn ghost small" id="cSelTurnkey">☑ Елементи — клуч на рака</button>
+                <button class="btn ghost small" id="cSelGrey">☑ Елементи — сива фаза</button>
+              </div>
               <button class="btn ghost" id="cSaveQuote">Зачувај понуда</button>
               <span id="cNote" class="hint"></span>
             </div>
@@ -340,6 +344,23 @@
       <span style="flex: 1;"></span>
       <button class="btn ghost" data-close>Откажи</button>
       <button class="btn accent" id="mSave">Зачувај</button>
+    </div>
+  </div>
+</div>
+
+<!-- Модал: кои елементи влегуваат во печатената понуда -->
+<div class="modal-back" id="offerSelModal">
+  <div class="modal" style="max-width: 760px;">
+    <div class="modal-head"><h3 id="osTitle">Елементи во понудата</h3>
+      <div class="modal-head-actions"><button class="btn ghost small" id="osAll">Сите</button><button class="btn ghost small" id="osNone">Ниедно</button><button class="x-close" data-close>×</button></div></div>
+    <div class="modal-body" style="gap: 10px;">
+      <div class="hint" id="osCount"></div>
+      <div id="osBody"></div>
+    </div>
+    <div class="modal-foot">
+      <span class="hint" style="flex: 1; align-self: center;">Изборот се чува со понудата при „Зачувај понуда“.</span>
+      <button class="btn ghost" data-close>Затвори</button>
+      <button class="btn accent" id="osPrint">🖨 Генерирај понуда</button>
     </div>
   </div>
 </div>

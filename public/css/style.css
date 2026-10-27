@@ -665,3 +665,21 @@ body.notice-closed .nav-hero { top: 0; }
 #tab-explain .x-var { border: 1px solid var(--line); background: var(--panel); border-radius: 2px; padding: 4px 8px; font-size: 11.5px; cursor: pointer; }
 #tab-explain .x-var:hover { border-color: var(--accent); }
 #tab-explain .x-formula.x-bad { border-color: #a13527; color: #a13527; }
+
+/* ── Админ: избор на елементи во понудата ── */
+#osBody { display: grid; gap: 10px; }
+.os-sec { border: 1px solid var(--line); border-radius: 3px; background: #fff; }
+.os-sec.off { opacity: .55; }
+.os-sec .os-head { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-weight: 600; font-size: 13px; background: var(--panel); cursor: pointer; user-select: none; }
+.os-sec.open .os-head { border-bottom: 1px solid var(--line); }
+.os-sec .os-chev { color: var(--muted); font-size: 11px; width: 10px; transition: transform .15s; }
+.os-sec.open .os-chev { transform: rotate(90deg); }
+.os-sec .os-n { margin-left: auto; font-weight: 400; font-family: var(--mono); font-size: 11px; }
+.os-sec .os-items { display: none; padding: 6px 12px 10px 30px; }
+.os-sec.open .os-items { display: grid; }
+.os-sec .os-items label { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; font-size: 12.5px; cursor: pointer; }
+.os-sec input[type="checkbox"] { width: auto; margin-top: 2px; flex: none; }
+.os-sec .os-items label.os-custom span { color: var(--accent); }
+.os-sec .os-del { margin-left: auto; }
+.os-sec .os-add { display: flex; gap: 8px; margin-top: 6px; }
+.os-sec .os-add input { flex: 1; font-size: 12.5px; padding: 6px 8px; }

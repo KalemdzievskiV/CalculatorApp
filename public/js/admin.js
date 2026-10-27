@@ -896,6 +896,8 @@
     calc.terraceType2 = 'covered';
     calc.plan = null;
     calc.loaded = null;
+    calc.offerExclude = { turnkey: {}, grey: {} };
+    calc.offerExtra = { turnkey: {}, grey: {} };
     syncTerrace();
     calc.outerH = 4.6;
   }
@@ -1212,6 +1214,12 @@
     calc.terraceType = 'open';
     calc.terraceType2 = 'covered';
     calc.plan = qt.plan || null;
+    calc.offerExclude = { turnkey: {}, grey: {} };
+    calc.offerExtra = { turnkey: {}, grey: {} };
+    ['turnkey', 'grey'].forEach((v) => {
+      Object.assign(calc.offerExclude[v], (qt.offerExclude || {})[v] || {});
+      Object.assign(calc.offerExtra[v], JSON.parse(JSON.stringify((qt.offerExtra || {})[v] || {})));
+    });
     sumFloors();
     syncTerrace();
     calc.outerH = 4.6;
@@ -1281,7 +1289,7 @@
   $('#cSaveQuote').onclick = async () => {
     const r = await fetch('/api/quotes', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ client: calc.client.trim() || 'Без име', inputs: calc.inputs, windows: calc.windows, discountEur: calc.discountEur, totalEur: calcRes.totalEur, plan: calc.plan }),
+      body: JSON.stringify({ client: calc.client.trim() || 'Без име', inputs: calc.inputs, windows: calc.windows, discountEur: calc.discountEur, totalEur: calcRes.totalEur, plan: calc.plan, offerExclude: calc.offerExclude, offerExtra: calc.offerExtra }),
     }).then((x) => x.json());
     calc.loaded = { client: calc.client.trim() || 'Без име', createdAt: new Date().toISOString(), totalEur: calcRes.totalEur };
     $('#cNote').innerHTML = 'Зачувано ✓ <a href="index.html?quote=' + r.id + '" target="_blank">линк</a>';
@@ -1480,19 +1488,155 @@
     }, 0);
   }
 
-  function offerSection(s) {
+  // Елементи во понудата: секоја секција и ред има ид (s2, s2i0, s2p1, s2n0, s2c<id> за додадени);
+  // исклучените се во calc.offerExclude[варијанта], додадените во calc.offerExtra[варијанта][секција]
+  const specVal = (sp) => (sp.codes ? `${q(Math.round(qtyOfCodes(sp.codes)))} ${sp.unit || ''}` : sp.value || '');
+  const emptySel = () => ({ turnkey: {}, grey: {} });
+  const offerEx = (variant) => {
+    if (!calc.offerExclude) calc.offerExclude = emptySel();
+    return calc.offerExclude[variant] || (calc.offerExclude[variant] = {});
+  };
+  const offerExtra = (variant, si) => {
+    if (!calc.offerExtra) calc.offerExtra = emptySel();
+    const v = calc.offerExtra[variant] || (calc.offerExtra[variant] = {});
+    return v[`s${si}`] || (v[`s${si}`] = []);
+  };
+  const offerParts = (s, si, variant) => [
+    ...s.items.map((x, j) => ({ id: `s${si}i${j}`, kind: 'item', x })),
+    ...offerExtra(variant, si).map((x) => ({ id: `s${si}c${x.id}`, kind: 'item', x, custom: true })),
+    ...s.specs.map((x, j) => ({ id: `s${si}p${j}`, kind: 'spec', x })),
+    ...s.notes.map((x, j) => ({ id: `s${si}n${j}`, kind: 'note', x })),
+  ];
+
+  function offerSection(s, si, variant) {
+    const ex = offerEx(variant);
+    if (ex[`s${si}`]) return '';
+    const parts = offerParts(s, si, variant).filter((p) => !ex[p.id]);
+    if (!parts.length) return '';
     let h = `<div class="of-sec"><h3>${esc(s.title)}</h3>`;
-    if (s.items.length) {
-      h += '<ul>' + s.items.map((i) =>
+    const items = parts.filter((p) => p.kind === 'item');
+    if (items.length) {
+      h += '<ul>' + items.map(({ x: i }) =>
         `<li>${esc(i.text)}${i.value ? ` — <b>${esc(i.value)}</b>` : ''}</li>`).join('') + '</ul>';
     }
-    s.specs.forEach((sp) => {
-      const val = sp.codes ? `${q(Math.round(qtyOfCodes(sp.codes)))} ${esc(sp.unit || '')}` : esc(sp.value);
-      h += `<div class="of-spec"><span>${esc(sp.label)}</span><b>${val}</b></div>`;
+    parts.filter((p) => p.kind === 'spec').forEach(({ x: sp }) => {
+      h += `<div class="of-spec"><span>${esc(sp.label)}</span><b>${esc(specVal(sp))}</b></div>`;
     });
-    s.notes.forEach((n) => { h += `<p class="of-note">${esc(n)}</p>`; });
+    parts.filter((p) => p.kind === 'note').forEach(({ x: n }) => { h += `<p class="of-note">${esc(n)}</p>`; });
     return h + '</div>';
   }
+
+  // Модал за избор на елементи во понудата (секциите се затворени при отворање)
+  let osVariant = 'turnkey';
+  const osOpen = new Set();
+  async function openOfferSel(variant) {
+    if (!calcRes) { offerFail('Пресметката не е подготвена.'); return; }
+    if (!offerTpl) { offerErr = ''; offerTpl = await loadOfferTpl(); }
+    if (!offerTpl || !offerTpl[variant]) { offerFail(offerErr || 'Шаблонот за понуда не е вчитан.'); return; }
+    osVariant = variant;
+    osOpen.clear();
+    $('#osTitle').textContent = 'Елементи во понудата — ' + (variant === 'grey' ? 'сива фаза' : 'клуч на рака');
+    renderOfferSel();
+    $('#offerSelModal').classList.add('open');
+  }
+
+  function renderOfferSel(focusSec) {
+    const t = offerTpl[osVariant], ex = offerEx(osVariant);
+    $('#osBody').innerHTML = t.sections.map((s, si) => {
+      const parts = offerParts(s, si, osVariant);
+      const label = (p) => p.kind === 'item' ? esc(p.x.text) + (p.x.value ? ` — <b>${esc(p.x.value)}</b>` : '')
+        : p.kind === 'spec' ? `${esc(p.x.label)} <span class="mono muted">${esc(specVal(p.x))}</span>`
+        : `<i class="muted">${esc(p.x)}</i>`;
+      return `<div class="os-sec${osOpen.has(si) ? ' open' : ''}" data-sec="s${si}" data-si="${si}">
+        <div class="os-head"><span class="os-chev">▸</span><input type="checkbox" data-id="s${si}"><span class="os-title">${esc(s.title)}</span><span class="muted os-n"></span></div>
+        <div class="os-items">
+          ${parts.map((p) => `<label class="${p.custom ? 'os-custom' : ''}"><input type="checkbox" data-id="${p.id}"> <span>${label(p)}</span>${p.custom ? `<button class="icon-btn os-del" data-del="${p.x.id}" title="Избриши го додадениот елемент">×</button>` : ''}</label>`).join('')}
+          <div class="os-add"><input type="text" placeholder="Нов елемент во „${esc(s.title)}“…" data-add="${si}"><button class="btn ghost small" data-addbtn="${si}">+ Додај</button></div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const body = $('#osBody');
+    body.querySelectorAll('.os-head').forEach((h) => {
+      h.onclick = (e) => {
+        if (e.target.tagName === 'INPUT') return;
+        const sec = h.parentElement, si = +sec.dataset.si;
+        sec.classList.toggle('open');
+        if (sec.classList.contains('open')) osOpen.add(si); else osOpen.delete(si);
+      };
+    });
+    body.querySelectorAll('input[data-id]').forEach((cb) => {
+      cb.onchange = () => {
+        const id = cb.dataset.id;
+        if (/^s\d+$/.test(id)) {
+          // Секција: вклучи/исклучи ја целата заедно со сите редови
+          const si = +id.slice(1);
+          delete ex[id];
+          offerParts(t.sections[si], si, osVariant).forEach((p) => { if (cb.checked) delete ex[p.id]; else ex[p.id] = true; });
+          if (!cb.checked) ex[id] = true;
+        } else {
+          if (cb.checked) { delete ex[id]; delete ex[id.match(/^s\d+/)[0]]; } else ex[id] = true;
+        }
+        syncOfferSel();
+      };
+    });
+    // Додавање нов елемент во секцијата (се печати како ред во листата)
+    const add = (si) => {
+      const inp = body.querySelector(`input[data-add="${si}"]`);
+      const text = inp.value.trim();
+      if (!text) { inp.focus(); return; }
+      offerExtra(osVariant, si).push({ id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), text: text.slice(0, 300) });
+      delete ex[`s${si}`];
+      osOpen.add(si);
+      renderOfferSel(si);
+    };
+    body.querySelectorAll('[data-addbtn]').forEach((b) => { b.onclick = () => add(+b.dataset.addbtn); });
+    body.querySelectorAll('input[data-add]').forEach((inp) => {
+      inp.onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); add(+inp.dataset.add); } };
+    });
+    body.querySelectorAll('[data-del]').forEach((b) => {
+      b.onclick = (e) => {
+        e.preventDefault();
+        const si = +b.closest('.os-sec').dataset.si;
+        const list = offerExtra(osVariant, si);
+        list.splice(list.findIndex((x) => x.id === b.dataset.del), 1);
+        delete ex[`s${si}c${b.dataset.del}`];
+        renderOfferSel(si);
+      };
+    });
+    syncOfferSel();
+    if (focusSec != null) body.querySelector(`input[data-add="${focusSec}"]`).focus();
+  }
+
+  // Ги усогласува полињата со изборот (секцијата е делумно штиклирана ако дел од редовите се исклучени)
+  function syncOfferSel() {
+    const t = offerTpl[osVariant], ex = offerEx(osVariant);
+    let on = 0, all = 0;
+    t.sections.forEach((s, si) => {
+      const box = $(`#osBody [data-sec="s${si}"]`);
+      const parts = offerParts(s, si, osVariant);
+      const secOff = !!ex[`s${si}`];
+      let n = 0;
+      parts.forEach((p) => {
+        const inc = !secOff && !ex[p.id];
+        box.querySelector(`input[data-id="${p.id}"]`).checked = inc;
+        if (inc) n++;
+      });
+      const head = box.querySelector(`input[data-id="s${si}"]`);
+      head.checked = !secOff && n > 0;
+      head.indeterminate = !secOff && n > 0 && n < parts.length;
+      box.classList.toggle('off', secOff || !n);
+      box.querySelector('.os-n').textContent = `${n}/${parts.length}`;
+      on += n; all += parts.length;
+    });
+    $('#osCount').textContent = `Вклучени ${on} од ${all} реда. Кликни на секција за да ја отвориш. Отштиклираните не се печатат; секција без ниеден ред се прескокнува.`;
+  }
+
+  $('#cSelTurnkey').onclick = () => openOfferSel('turnkey');
+  $('#cSelGrey').onclick = () => openOfferSel('grey');
+  $('#osAll').onclick = () => { calc.offerExclude[osVariant] = {}; syncOfferSel(); };
+  $('#osNone').onclick = () => { const ex = offerEx(osVariant); offerTpl[osVariant].sections.forEach((s, si) => { ex[`s${si}`] = true; offerParts(s, si, osVariant).forEach((p) => { ex[p.id] = true; }); }); syncOfferSel(); };
+  $('#osPrint').onclick = () => { $('#offerSelModal').classList.remove('open'); buildOffer(osVariant); };
 
   function offerFail(msg) {
     const n = $('#cNote');
@@ -1553,7 +1697,7 @@
       <p style="font-size:12.5px;line-height:1.5;">${esc(t.desc)}</p>
       ${areas}
       <div class="of-sec"><h3>Вклучени елементи во понудата</h3></div>
-      ${t.sections.map(offerSection).join('')}
+      ${t.sections.map((s, si) => offerSection(s, si, variant)).join('')}
 
       <div class="of-page">
         ${head(t.title)}
