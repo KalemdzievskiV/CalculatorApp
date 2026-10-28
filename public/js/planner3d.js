@@ -416,6 +416,37 @@
     };
   }
 
+  // Горен раб на ѕид од првиот кат под еднокосниот кров: под кровот ја следи косината, другаде H.
+  // Каде ѕидот излегува од контурата на кровот има скок (вертикален раб).
+  function lowTop(parts, H) {
+    return (w, ux, uy, u0, u1) => {
+      const at = (u) => [w.x1 + ux * u, w.y1 + uy * u];
+      const val = (u) => {
+        const [x, y] = at(u), p = parts.find((q) => inPoly(q.outline, x, y));
+        return p ? H + roofZ(p.planes, x, y) : H;
+      };
+      const us = [u0, u1];
+      for (const p of parts) {
+        const O = p.outline;
+        for (let i = 0; i < O.length; i++) {
+          const [ax, ay] = O[i], [bx, by] = O[(i + 1) % O.length], ex = bx - ax, ey = by - ay;
+          const den = ux * ey - uy * ex;
+          if (Math.abs(den) < 1e-9) continue;
+          const u = ((ax - w.x1) * ey - (ay - w.y1) * ex) / den, k = ((ax - w.x1) * uy - (ay - w.y1) * ux) / den;
+          if (u > u0 + 0.5 && u < u1 - 0.5 && k >= 0 && k <= 1) us.push(u);
+        }
+      }
+      us.sort((a, b) => b - a);   // од крајот кон почетокот
+      const out = [];
+      const add = (u, z) => { const l = out[out.length - 1]; if (!l || Math.abs(l[0] - u) > 0.01 || Math.abs(l[1] - z) > 0.01) out.push([u, z]); };
+      us.forEach((u, i) => {
+        if (i > 0) add(u, val(u + 0.5));
+        if (i < us.length - 1) add(u, val(u - 0.5));
+      });
+      return out;
+    };
+  }
+
   // Кров: секој дел е рамна површина; плус челен лим по работ
   function roof(r, Htop) {
     const RT = 14;  // cm — дебелина на кровот за приказ
@@ -552,7 +583,8 @@
         mesh(g, floorMats[rm.floor] || floorMats.laminat, false);
       }
       const isTop = r && i === r.top && show.roof;
-      for (const w of f.walls) wall(w, f.base, f.h, isTop && w.kind === 'out' ? roofTop(r.parts, f.h) : null, w.kind === 'out' ? wallMat : wallInMat, { loops: f.loops, ground: i === 0, inMat: wallOutInMat });
+      const lowR = i === 0 && model.lowRoof && show.roof ? lowTop(model.lowRoof.parts, f.h) : null;
+      for (const w of f.walls) wall(w, f.base, f.h, isTop && w.kind === 'out' ? roofTop(r.parts, f.h) : lowR && w.kind === 'out' ? lowR : null, w.kind === 'out' ? wallMat : wallInMat, { loops: f.loops, ground: i === 0, inMat: wallOutInMat });
       for (const x of f.stairs) stairs(x, f.base, f.h);
       for (const t of f.terraces) terrace(t, f.base, f.h);
     });
@@ -562,6 +594,8 @@
       for (const lp of f0.loops) slab(lp, f0.base + f0.h - 0.5, 20, show.upper ? slabMat : roofMat);
     }
     if (r && show.roof && (r.top === 0 || show.upper)) roof(r, fl[r.top].base + fl[r.top].h);
+    // Еднокосен кров над деловите од првиот кат без ништо над нив
+    if (model.lowRoof && show.roof) roof(model.lowRoof, fl[0].base + fl[0].h);
 
     // Сонце и сенки според големината на моделот
     const bb = new T.Box3().setFromObject(group);

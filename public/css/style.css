@@ -753,3 +753,7 @@ body.notice-closed .nav-hero { top: 0; }
 .m3-slot select, .m3-rule :is(select, input) { width: 100%; font-size: 12.5px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 2px; background: #fff; font-family: inherit; }
 .m3-rule { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr) auto; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 12px; }
 @media (max-width: 760px) { .m3-rule { grid-template-columns: 1fr 1fr; } }
+.pl-sub { margin: 12px 0 6px; padding-top: 10px; border-top: 1px dashed var(--line); font-size: 12px; font-weight: 600; color: var(--ink); }
+.pl-idim { fill: #2f6f9f; font-size: 10.5px; }
+.pl-idim-ln { stroke: #2f6f9f; stroke-width: 1; stroke-opacity: .45; stroke-dasharray: 2 3; pointer-events: none; }
+.pl-snap { fill: rgba(219,75,59,.18); stroke: var(--accent); stroke-width: 2; pointer-events: none; }

@@ -13,12 +13,15 @@
   const SNAP_PX = 12;                   // привлекување кон постоечка точка/ѕид (во пиксели)
   const THICK = { out: 25, in: 12 };    // cm — дебелина само за приказ
   const DOOR_W = { out: 100, in: 90 };  // cm — стандардна ширина на врата
+  // sill = парапет: висина на долниот раб на прозорот од подот (cm)
   const WIN = {
-    win:  { label: 'Прозор', w: 120, h: 140 },
-    fix:  { label: 'Фикс прозор', w: 100, h: 140 },
-    balk: { label: 'Балконска врата', w: 90, h: 215 },
-    lizg: { label: 'Лизгачка врата', w: 240, h: 215 },
+    win:  { label: 'Прозор', w: 120, h: 140, sill: 90 },
+    fix:  { label: 'Фикс прозор', w: 100, h: 140, sill: 90 },
+    balk: { label: 'Балконска врата', w: 90, h: 215, sill: 0 },
+    lizg: { label: 'Лизгачка врата', w: 240, h: 215, sill: 0 },
   };
+  // Постарите планови немаат парапет → стандардниот за видот
+  const sillOf = (o) => (o.sill != null ? o.sill : WIN[o.kind].sill);
   // Типови простории; floor = стандарден под, fixed = подот не се бира
   const ROOMS = {
     dnevna: { label: 'Дневна / кујна', fill: 'rgba(214,170,110,.24)', stroke: '#b4874c', floor: 'laminat' },
@@ -30,7 +33,8 @@
   };
   const FLOORS = { laminat: 'Ламинат', plochki: 'Плочки' };
   const ROOF_TYPES = { flat: 'Рамен', mono: 'Еднокосен', gable: 'Двокосен', hip: 'Четирикосен' };
-  const ROOF_DEF = { type: 'gable', pitch: 15, overhang: 30, rot: null };
+  // lowPitch / lowRot: еднокосен кров над деловите од првиот кат без ништо над нив (пр. гаража)
+  const ROOF_DEF = { type: 'gable', pitch: 15, overhang: 30, rot: null, lowPitch: 10, lowRot: 0 };
   const STEP = 18;                      // cm — приближна висина на скалило
   const RECTS = { terrace: 'terraces', stair: 'stairs' };  // правоаголни објекти (влечење, поместување, големина)
   const TOOLS = [
@@ -51,7 +55,7 @@
     out: 'Клик за почеток, клик за секој агол. Внеси должина во cm и Enter за точна мерка. Клик на почетната точка ја затвора куќата. Двоен клик или Esc — крај. Shift — слободен агол.',
     in: 'Клик за почеток, клик за секој агол — точките се лепат на постоечките ѕидови. Внеси должина во cm и Enter. Двоен клик или Esc — крај.',
     door: 'Клик на ѕид за да поставиш врата. На внатрешен ѕид = внатрешна врата, на надворешен = влезна (блиндор).',
-    win: 'Клик на надворешен ѕид за прозор. Видот, големината и цената се менуваат десно — следниот прозор ја зема истата големина.',
+    win: 'Клик на надворешен ѕид за прозор. Видот, големината, парапетот (висина од подот) и цената се менуваат десно — следниот прозор ги зема истите мерки.',
     room: 'Клик во простор затворен со ѕидови за да му доделиш тип. Клик на постоечка просторија го менува типот.',
     terrace: 'Влечи правоаголник за тераса. Покриена / откриена се избира десно.',
     stair: 'Влечи правоаголник за скалите — стрелката покажува нагоре. Насоката се врти десно.',
@@ -121,12 +125,32 @@
   }
 
   // Точка при цртање ѕид: постоечка точка → ѕид → агол од 45° + мрежа
+  // Колку далеку (px) се лепи на ѕид: секаде врз нацртаната дебелина на ѕидот + малку
+  const wallSnapPx = () => Math.max(SNAP_PX, THICK.out * st.view.s / 2 + 8);
+  // Точка при цртање: агол на ѕид → прав (0/45/90°) правец што удира во ѕид → проекција на ѕид → мрежа.
+  // snap кажува на што се залепила (за ознаката на курсорот).
   function drawPoint(px, py, from, free) {
     const p = nearPoint(px, py);
-    if (p) return p;
-    const nw = nearWall(px, py);
-    if (nw) return { x: Math.round(nw.x), y: Math.round(nw.y) };
-    const m = toW(px, py);
+    if (p) return Object.assign(p, { snap: 'point' });
+    const m = toW(px, py), lim = wallSnapPx();
+    // Од почетната точка по прав правец до оската на ѕидот → внатрешниот ѕид останува исправен
+    if (from && !free) {
+      const a = Math.round(Math.atan2(m.y - from.y, m.x - from.x) / (Math.PI / 4)) * (Math.PI / 4);
+      const dx = Math.cos(a), dy = Math.sin(a);
+      let best = null;
+      for (const w of snapWalls()) {
+        const ex = w.x2 - w.x1, ey = w.y2 - w.y1, den = dx * ey - dy * ex;
+        if (Math.abs(den) < 1e-9) continue;
+        const t = ((w.x1 - from.x) * ey - (w.y1 - from.y) * ex) / den, k = ((w.x1 - from.x) * dy - (w.y1 - from.y) * dx) / den;
+        if (t < 5 || k < 0 || k > 1) continue;
+        const q = { x: from.x + dx * t, y: from.y + dy * t };
+        const [sx, sy] = toS(q.x, q.y), d = Math.hypot(sx - px, sy - py);
+        if (d < lim && (!best || d < best.d)) best = { d, x: Math.round(q.x), y: Math.round(q.y) };
+      }
+      if (best) return { x: best.x, y: best.y, snap: 'wall' };
+    }
+    const nw = nearWall(px, py, lim);
+    if (nw) return { x: Math.round(nw.x), y: Math.round(nw.y), snap: 'wall' };
     if (!from) return { x: snapG(m.x), y: snapG(m.y) };
     let dx = m.x - from.x, dy = m.y - from.y;
     if (free) { dx = snapG(dx); dy = snapG(dy); } else {
@@ -250,8 +274,56 @@
     return out;
   }
 
+  // Делови од првиот кат без ништо над нив (пр. гаража) → еднокосен кров наслонет на вториот кат.
+  // Регионите се добиваат од надворешните ѕидови на двата ката заедно (лица од рамнинскиот граф):
+  // лице во првиот кат, а надвор од вториот. Високата страна е кон ѕидот на вториот кат;
+  // таму нема препуст (кровот не влегува во катот).
+  function lowerRoofs() {
+    const fl = st.plan.floors, R = st.plan.roof;
+    if (fl.length < 2) return [];
+    const L0 = outerLoops(fl[0]), L1 = outerLoops(fl[1]);
+    if (!L0 || !L1) return [];
+    const up = fl[1].walls.filter((w) => w.kind === 'out');
+    const regs = faces({ walls: fl[0].walls.filter((w) => w.kind === 'out').concat(up) }).filter((fc) => {
+      const p = labelPoint(fc.pts);
+      return fc.area > 1 && L0.some((lp) => inPoly(lp, p.x, p.y)) && !L1.some((lp) => inPoly(lp, p.x, p.y));
+    });
+    const flat = R.type === 'flat', t = flat ? 0 : Math.tan((R.lowPitch ?? 10) * Math.PI / 180);
+    const onUp = (x, y) => up.some((w) => { const pr = project(w, x, y); return Math.hypot(pr.x - x, pr.y - y) < 1.5; });
+    return regs.map((fc) => {
+      const pts = fc.pts;
+      // Рабови што лежат на ѕид од вториот кат, со нормала нанадвор од регионот
+      const shared = [];
+      let sx = 0, sy = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const A = pts[i], B = pts[(i + 1) % pts.length], len = Math.hypot(B[0] - A[0], B[1] - A[1]);
+        if (len < 1 || !onUp(A[0], A[1]) || !onUp(B[0], B[1]) || !onUp((A[0] + B[0]) / 2, (A[1] + B[1]) / 2)) continue;
+        let nx = (B[1] - A[1]) / len, ny = -(B[0] - A[0]) / len;
+        const mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2;
+        if (inPoly(pts, mx + nx * 5, my + ny * 5)) { nx = -nx; ny = -ny; }
+        shared.push({ A, nx, ny });
+        sx += nx * len; sy += ny * len;
+      }
+      // Препуст наоколу, освен кон вториот кат (сечење по правата на заедничкиот раб, ако регионот е цел од едната страна)
+      let outline = offsetPoly(pts, R.overhang);
+      for (const e of shared) {
+        const inner = pts.every(([x, y]) => (x - e.A[0]) * e.nx + (y - e.A[1]) * e.ny <= 1);
+        if (inner) outline = clipHalf(outline, { a: e.nx, b: e.ny, c: -(e.nx * e.A[0] + e.ny * e.A[1]) }, { a: 0, b: 0, c: 0 });
+      }
+      const xs = outline.map((p) => p[0]), ys = outline.map((p) => p[1]);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      // Висока страна (рот): 0 = горе (y0), 1 = десно (x1), 2 = долу (y1), 3 = лево (x0)
+      const auto = !shared.length ? 0 : Math.abs(sx) >= Math.abs(sy) ? (sx > 0 ? 1 : 3) : (sy < 0 ? 0 : 2);
+      const rot = (auto + (R.lowRot || 0)) % 4;
+      const planes = roofPlanes(flat ? 'flat' : 'mono', t, x0, y0, x1, y1, rot);
+      const rise = Math.max(0, ...outline.map(([x, y]) => roofZ(planes, x, y)));
+      return { outline, planes, pieces: [outline], rot, rise, plan: Math.abs(polyArea(outline)) / 1e4, foot: Math.abs(polyArea(pts)) / 1e4 };
+    });
+  }
+
   // Кров над највисокиот кат: површина (коса), симс (препуст) и висина до слеме.
-  // Делот од првиот кат што не е покриен со вториот се смета како рамен кров.
+  // Делот од првиот кат што не е покриен со вториот добива свој еднокосен кров (lowerRoofs);
+  // ако остане непокриен дел (пр. вториот кат е цел внатре во првиот), тој се смета како рамен.
   function roofGeom() {
     const R = st.plan.roof, fl = st.plan.floors, top = fl.length - 1;
     const loops = outerLoops(fl[top]);
@@ -269,8 +341,13 @@
       return { outline, planes, pieces, rot, rise, plan: Math.abs(polyArea(outline)) / 1e4, foot: Math.abs(polyArea(loop)) / 1e4 };
     });
     const plan = parts.reduce((s, p) => s + p.plan, 0), foot = parts.reduce((s, p) => s + p.foot, 0);
-    const a1 = top ? outerArea(fl[0]) : null, exposed = a1 ? Math.max(0, a1 - foot) : 0;
-    return { parts, top, area: plan / Math.cos(ang) + exposed, exposed, sims: plan - foot, rise: Math.max(...parts.map((p) => p.rise)) };
+    const low = lowerRoofs(), lowAng = R.type === 'flat' ? 0 : (R.lowPitch ?? 10) * Math.PI / 180;
+    const lowPlan = low.reduce((s, p) => s + p.plan, 0), lowFoot = low.reduce((s, p) => s + p.foot, 0);
+    const lowArea = lowPlan / Math.cos(lowAng);
+    const a1 = top ? outerArea(fl[0]) : null, exposed = a1 ? Math.max(0, a1 - foot - lowFoot) : 0;
+    const lowRise = Math.max(0, ...low.map((p) => p.rise));
+    return { parts, top, low, lowArea, lowRise, area: plan / Math.cos(ang) + lowArea + exposed, exposed: exposed > 0.05 ? exposed : 0,
+      sims: plan - foot + lowPlan - lowFoot, rise: Math.max(...parts.map((p) => p.rise)) };
   }
 
   // Скали: должина на кракот (косо, од под до под) и број на скалила
@@ -581,6 +658,11 @@
     // Скали: газишта, стрелка нагоре
     for (const x of f.stairs) h += stairSvg(x, f, isSel('stair', x.id));
 
+    // Еднокосен кров над деловите од првиот кат без ништо над нив
+    if (st.floor === 0 && st.plan.floors.length === 2) {
+      const RG = roofGeom();
+      if (RG) for (const part of RG.low) h += `<polygon points="${part.outline.map(([x, y]) => toS(x, y).join(',')).join(' ')}" class="pl-roofln out"/>`;
+    }
     // Кров (само на највисокиот кат): препуст и линии на слеме / гребени
     if (st.floor === st.plan.floors.length - 1) {
       const RG = roofGeom();
@@ -601,6 +683,8 @@
 
     // Мерки на ѕидовите (cm)
     for (const w of f.walls) h += dimLabel(w.x1, w.y1, w.x2, w.y2, thick(w), isSel('wall', w.id));
+    // Внатрешни (светли) мерки на просториите — се вклучуваат/исклучуваат од лентата со алатки
+    if (st.innerDims && !isSlab()) h += innerDimsSvg(f, L);
 
     // Рачки за аглите на избраниот ѕид
     if (st.tool === 'select' && st.sel && st.sel.type === 'wall') {
@@ -621,8 +705,11 @@
       h += `<circle cx="${x1}" cy="${y1}" r="4" fill="var(--accent)"/>`;
     }
     if (st.cursor && (st.tool === 'out' || st.tool === 'in')) {
-      const [cx, cy] = toS(st.cursor.x, st.cursor.y);
-      h += `<circle cx="${cx}" cy="${cy}" r="5" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+      const [cx, cy] = toS(st.cursor.x, st.cursor.y), sn = st.cursor.snap;
+      // Залепено: квадрат на агол, ромб на ѕид; инаку круг
+      if (sn === 'point') h += `<rect x="${cx - 6}" y="${cy - 6}" width="12" height="12" class="pl-snap"/>`;
+      else if (sn === 'wall') h += `<path d="M ${cx} ${cy - 7} L ${cx + 7} ${cy} L ${cx} ${cy + 7} L ${cx - 7} ${cy} Z" class="pl-snap"/>`;
+      else h += `<circle cx="${cx}" cy="${cy}" r="5" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
     }
     // Преглед на врата / прозор
     if (st.ghost) h += st.tool === 'door' ? doorSvg(st.ghost.w, st.ghost.d, true, true) : winSvg(st.ghost.w, st.ghost.d, true, true);
@@ -737,6 +824,52 @@
 
   const isSel = (type, id) => st.sel && st.sel.type === type && st.sel.id === id;
 
+  // Внатрешни (светли) мерки на затворен простор: секој раб се поместува навнатре за половина
+  // дебелина на својот ѕид, соседните прави се сечат → внатрешен полигон; мерка по секој раб.
+  function innerDims(f, pts) {
+    const thickAt = (x, y) => {
+      for (const w of f.walls) { const pr = project(w, x, y); if (Math.hypot(pr.x - x, pr.y - y) < 1) return THICK[w.kind]; }
+      return THICK.in;
+    };
+    // Без колинеарни темиња (каде друг ѕид се спојува од надвор)
+    let P = pts.filter((p, i) => {
+      const a = pts[(i - 1 + pts.length) % pts.length], b = pts[(i + 1) % pts.length];
+      return Math.abs((p[0] - a[0]) * (b[1] - p[1]) - (p[1] - a[1]) * (b[0] - p[0])) > 1e-3 * Math.hypot(b[0] - a[0], b[1] - a[1]);
+    });
+    const n = P.length;
+    if (n < 3) return [];
+    const lines = P.map((A, i) => {
+      const B = P[(i + 1) % n], len = Math.hypot(B[0] - A[0], B[1] - A[1]);
+      let nx = -(B[1] - A[1]) / len, ny = (B[0] - A[0]) / len;
+      const mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2;
+      if (!inPoly(P, mx + nx * 2, my + ny * 2)) { nx = -nx; ny = -ny; }
+      const d = thickAt(mx, my) / 2;
+      return { nx, ny, c: nx * A[0] + ny * A[1] + d, dx: B[0] - A[0], dy: B[1] - A[1] };
+    });
+    const V = lines.map((l, i) => {
+      const k = lines[(i - 1 + n) % n], den = k.nx * l.ny - k.ny * l.nx;
+      return [(k.c * l.ny - l.c * k.ny) / den, (k.nx * l.c - l.nx * k.c) / den];
+    });
+    return V.map((A, i) => {
+      const B = V[(i + 1) % n], l = lines[i];
+      return { A, B, len: Math.hypot(B[0] - A[0], B[1] - A[1]), nx: l.nx, ny: l.ny };
+    }).filter((e) => e.len >= 10);
+  }
+  function innerDimsSvg(f, L) {
+    let h = '';
+    for (const fc of L.faces) for (const e of innerDims(f, fc.pts)) {
+      const [x1, y1] = toS(e.A[0], e.A[1]), [x2, y2] = toS(e.B[0], e.B[1]);
+      if (Math.hypot(x2 - x1, y2 - y1) < 46) continue;
+      // Натписот малку навнатре од ѕидот, паралелно со него
+      const mx = (x1 + x2) / 2 + e.nx * 10, my = (y1 + y2) / 2 + e.ny * 10;
+      let ang = Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI;
+      if (ang > 90 || ang < -90) ang += 180;
+      h += `<line x1="${x1 + e.nx * 3}" y1="${y1 + e.ny * 3}" x2="${x2 + e.nx * 3}" y2="${y2 + e.ny * 3}" class="pl-idim-ln"/>`;
+      h += `<text x="${mx}" y="${my}" class="pl-dim pl-idim" text-anchor="middle" dominant-baseline="middle" transform="rotate(${ang} ${mx} ${my})">${Math.round(e.len)}</text>`;
+    }
+    return h;
+  }
+
   // ── Страничен панел: избран елемент + збир + што ќе се пополни ──
   function renderPanel() {
     if (isSlab()) return renderSlabPanel();
@@ -760,6 +893,8 @@
       if (o) h += `<div class="pl-box"><h5>Прозор</h5>
         <div class="field"><label>Вид</label><select id="plWKind">${Object.entries(WIN).map(([k, W]) => `<option value="${k}"${o.kind === k ? ' selected' : ''}>${W.label}</option>`).join('')}</select></div>
         <div class="pl-2">${num('plOpW', 'Ширина', o.w, 30, 5)}${num('plWH', 'Висина', o.h, 20, 5)}</div>
+        <div class="pl-2">${num('plWS', 'Парапет', sillOf(o), 0, 5)}<div class="field"><label>Горен раб <span class="unit">cm</span></label><input type="text" readonly tabindex="-1" value="${Math.round(sillOf(o) + o.h)}"></div></div>
+        ${sillOf(o) + o.h > f.h - 10 ? `<p class="hint pl-warn">Парапет + висина (${Math.round(sillOf(o) + o.h)} cm) е повеќе од висината на катот (${Math.round(f.h)} cm) — во 3D прозорот се скратува.</p>` : ''}
         <div class="field"><label>Цена <span class="unit">€ / ком</span></label><input type="number" min="0" step="1" id="plWPrice" value="${winPrice(o)}">
           <div class="hint">${o.manual ? 'Рачно внесена · <a href="#" id="plWAuto">пресметај по m²</a>' : `${fmt(o.w * o.h / 1e4)} m² × ${fmt(st.opts.eurM2, 0)} €/m²`}</div></div>
         <div style="display:flex;gap:8px;">${o.kind === 'balk' ? '<button class="btn ghost small" id="plFlip">⇄ Сврти</button>' : ''}<button class="btn danger small" id="plDel">Избриши прозор</button></div></div>`;
@@ -798,7 +933,12 @@
         <div class="pl-2">${R.type === 'flat' ? '' : `<div class="field"><label>Наклон <span class="unit">°</span></label><input type="number" min="3" max="60" step="1" id="plRoofP" value="${R.pitch}"></div>`}
           <div class="field"><label>Препуст <span class="unit">cm</span></label><input type="number" min="0" max="200" step="5" id="plRoofO" value="${R.overhang}"></div></div>
         ${rotLbl ? `<button class="btn ghost small" id="plRoofR">${rotLbl}</button>` : ''}
+        ${RG && RG.low.length ? `<div class="pl-sub">Кров над прв кат <span class="pl-muted">(делот без втор кат над него)</span></div>
+          ${R.type === 'flat' ? '' : `<div class="pl-2"><div class="field"><label>Наклон <span class="unit">°</span></label><input type="number" min="3" max="45" step="1" id="plLowP" value="${R.lowPitch ?? 10}"></div>
+            <div class="field"><label>&nbsp;</label><button class="btn ghost small" id="plLowR">⟳ Сврти наклон</button></div></div>`}
+          ${RG.lowRise > st.plan.floors[1].h - 20 ? `<p class="hint pl-warn">Кровот над првиот кат се крева ${fmt(RG.lowRise / 100)} m — повеќе од висината на вториот кат. Намали го наклонот.</p>` : ''}` : ''}
         ${RG ? `<div class="pl-row"><span>Кров${R.type === 'flat' ? '' : ' (косо)'}</span><b>${fmt(RG.area)} m²</b></div>
+          ${RG.low.length ? `<div class="pl-row"><span class="pl-muted">од тоа еднокосен над прв кат</span><b>${fmt(RG.lowArea)} m²</b></div>` : ''}
           ${RG.exposed ? `<div class="pl-row"><span class="pl-muted">од тоа рамен над прв кат</span><b>${fmt(RG.exposed)} m²</b></div>` : ''}
           <div class="pl-row"><span>Симс (препуст)</span><b>${fmt(RG.sims)} m²</b></div>
           <div class="pl-row"><span>Висина до слеме</span><b>${fmt((st.plan.floors.reduce((a, x) => a + x.h, 0) + RG.rise) / 100)} m</b></div>`
@@ -883,7 +1023,8 @@
     });
     numIn('#plOpW', 30, (o, v) => { o.w = v; if (sel.type === 'win') rememberWin(o); });
     numIn('#plWH', 20, (o, v) => { o.h = v; rememberWin(o); });
-    on('#plWKind', 'change', (e) => edit((o) => { o.kind = e.target.value; o.w = WIN[o.kind].w; o.h = WIN[o.kind].h; rememberWin(o); }));
+    numIn('#plWS', 0, (o, v) => { o.sill = v; rememberWin(o); });
+    on('#plWKind', 'change', (e) => edit((o) => { o.kind = e.target.value; o.w = WIN[o.kind].w; o.h = WIN[o.kind].h; o.sill = WIN[o.kind].sill; rememberWin(o); }));
     on('#plWPrice', 'change', (e) => { const v = parseFloat(e.target.value); if (v >= 0) edit((o) => { o.price = Math.round(v); o.manual = true; }); });
     on('#plWAuto', 'click', (e) => { e.preventDefault(); edit((o) => { o.manual = false; delete o.price; }); });
     on('#plFlip', 'click', () => edit((d) => { d.flip = !d.flip; }));
@@ -905,6 +1046,8 @@
       const RG = roofGeom(), cur = RG ? RG.parts[0].rot : st.plan.roof.rot || 0;
       plan((p) => { p.roof.rot = (cur + 1) % (p.roof.type === 'mono' ? 4 : 2); });
     });
+    on('#plLowP', 'change', (e) => { const v = parseFloat(e.target.value); if (v >= 3 && v <= 45) plan((p) => { p.roof.lowPitch = v; }); });
+    on('#plLowR', 'click', () => plan((p) => { p.roof.lowRot = ((p.roof.lowRot || 0) + 1) % 4; }));
     on('#plCopy', 'click', () => {
       snapshot();
       for (const w of st.plan.floors[0].walls) if (w.kind === 'out') F().walls.push({ ...w, id: uid() });
@@ -912,7 +1055,7 @@
     });
   }
 
-  function rememberWin(o) { st.lastWin = { kind: o.kind, w: o.w, h: o.h }; }
+  function rememberWin(o) { st.lastWin = { kind: o.kind, w: o.w, h: o.h, sill: sillOf(o) }; }
 
   function refresh() {
     render(); renderPanel();
@@ -944,7 +1087,8 @@
       const ops = (w) => [
         ...f.doors.filter((d) => d.wall === w.id).map((d) => ({ t: d.t, w: d.w, bottom: 0, top: Math.min(210, H - 10) })),
         ...f.windows.filter((o) => o.wall === w.id).map((o) => {
-          const bottom = o.kind === 'balk' || o.kind === 'lizg' ? 0 : 90;
+          // Парапетот од 2D планот; горниот раб останува барем 10 cm под таванот
+          const bottom = Math.max(0, Math.min(sillOf(o), H - 40));
           return { t: o.t, w: o.w, bottom, top: Math.min(bottom + o.h, H - 10), glass: true };
         }),
       ];
@@ -965,6 +1109,7 @@
       // Материјали од админ → „3D материјали“ (веќе со применети правила за оваа понуда)
       mat3d: st.opts.mat3d || null,
       roof: RG && { top: RG.top, flat: st.plan.roof.type === 'flat', parts: RG.parts.map((p) => ({ outline: p.outline, planes: p.planes, pieces: p.pieces })) },
+      lowRoof: RG && RG.low.length ? { flat: st.plan.roof.type === 'flat', parts: RG.low.map((p) => ({ outline: p.outline, planes: p.planes, pieces: p.pieces })) } : null,
     };
   }
 
@@ -1012,7 +1157,7 @@
     if (!nw) return null;
     const lw = st.lastWin || { kind: 'win', ...WIN.win };
     const w = Math.min(isWin ? lw.w : DOOR_W[nw.w.kind], wlen(nw.w));
-    return { w: nw.w, d: { t: Math.max(w / 2, Math.min(wlen(nw.w) - w / 2, nw.t)), w, h: lw.h, kind: lw.kind } };
+    return { w: nw.w, d: { t: Math.max(w / 2, Math.min(wlen(nw.w) - w / 2, nw.t)), w, h: lw.h, kind: lw.kind, sill: lw.sill != null ? lw.sill : WIN[lw.kind].sill } };
   }
 
   function onDown(e) {
@@ -1041,7 +1186,7 @@
       if (!g) return;
       snapshot();
       const o = { id: uid(), wall: g.w.id, t: g.d.t, w: g.d.w };
-      if (t === 'win') { Object.assign(o, { h: g.d.h, kind: g.d.kind }); f.windows.push(o); } else f.doors.push(o);
+      if (t === 'win') { Object.assign(o, { h: g.d.h, kind: g.d.kind, sill: g.d.sill }); f.windows.push(o); } else f.doors.push(o);
       clampOpenings();
       st.ghost = null;
       refresh();
@@ -1214,6 +1359,7 @@
           <span class="pl-sep"></span>
           <button type="button" class="pl-tool" id="plUndo" title="Ctrl+Z">↶ Врати</button>
           <button type="button" class="pl-tool" id="plFit">⤢ Целиот план</button>
+          <button type="button" class="pl-tool" id="plIDim" title="Светли мерки во просториите (од ѕид до ѕид)">📏 Внатрешни мерки</button>
         </div>
         <div class="pl-canvas"><svg id="plSvg"></svg><div class="pl-typed" id="plTyped"></div></div>
         <div class="pl-3dview" id="pl3d"></div>
@@ -1230,6 +1376,12 @@
     $('#plUndo').onclick = undo;
     root.querySelectorAll('[data-view]').forEach((b) => { b.onclick = () => setView(b.dataset.view === '3d'); });
     $('#plFit').onclick = () => { fit(); render(); };
+    $('#plIDim').onclick = () => {
+      st.innerDims = !st.innerDims;
+      try { localStorage.setItem('mdaInnerDims', st.innerDims ? '1' : '0'); } catch (e) { /* без меморија */ }
+      $('#plIDim').classList.toggle('on', st.innerDims);
+      render();
+    };
     svg.addEventListener('pointerdown', onDown);
     svg.addEventListener('pointermove', onMove);
     svg.addEventListener('pointerup', onUp);
@@ -1323,6 +1475,9 @@
     p.slab = Object.assign(emptyFloor(), p.slab, { doors: [], windows: [], rooms: [], terraces: [], stairs: [] });
     st = { plan: p, floor: 0, tool: 'out', view3d: false, view: { s: 0.5, tx: 60, ty: 60 }, sel: null, draw: null, drag: null, typed: '', hist: [], dirty: false,
       opts: Object.assign({ floors: 1, labels: {}, eurM2: 150 }, opts), onApply };
+    // Внатрешните мерки се стандардно вклучени; изборот се памети во прелистувачот
+    try { st.innerDims = localStorage.getItem('mdaInnerDims') !== '0'; } catch (e) { st.innerDims = true; }
+    $('#plIDim').classList.toggle('on', st.innerDims);
     root.classList.add('open');
     root.classList.remove('pl-3d');
     root.querySelectorAll('[data-view]').forEach((b) => b.classList.toggle('on', b.dataset.view === '2d'));
