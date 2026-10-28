@@ -55,6 +55,7 @@
     room: 'Клик во простор затворен со ѕидови за да му доделиш тип. Клик на постоечка просторија го менува типот.',
     terrace: 'Влечи правоаголник за тераса. Покриена / откриена се избира десно.',
     stair: 'Влечи правоаголник за скалите — стрелката покажува нагоре. Насоката се врти десно.',
+    slab: 'Клик за секој агол на бетонската плоча, внеси должина во cm и Enter за точна мерка. Клик на почетната точка ја затвора плочата. Бањите од првиот кат се прикажани за водоводот.',
     '3d': 'Влечи за вртење, десен клик (или Shift) за поместување, тркалце за зум. Висините и кровот се менуваат десно.',
   };
 
@@ -65,10 +66,15 @@
   const snapG = (v) => Math.round(v / GRID) * GRID;
   const r2 = (v) => Math.round(v * 100) / 100;
   const fmt = (v, d = 2) => new Intl.NumberFormat('mk-MK', { maximumFractionDigits: d }).format(v);
-  const F = () => st.plan.floors[st.floor];
+  // Бетонската плоча е посебен таб: контура (надворешни ѕидови) под куќата, без простории и отвори
+  const SLAB = 'slab';
+  const isSlab = () => st.floor === SLAB;
+  const F = () => (isSlab() ? st.plan.slab : st.plan.floors[st.floor]);
   const emptyFloor = (h) => ({ h: h || 285, walls: [], doors: [], windows: [], rooms: [], terraces: [], stairs: [] });
   const roomTool = (t) => t && t.startsWith('room:') ? t.slice(5) : null;
-  const floorName = (i) => (i ? 'Втор' : 'Прв') + ' кат';
+  const floorName = (i) => (i === SLAB ? 'Бетонска плоча' : (i ? 'Втор' : 'Прв') + ' кат');
+  const SLAB_KEY = 'BETONSKA_PLOCHA';
+  const SLAB_EDGE = 10;                 // cm — дебелина на ивицата на плочата (само за приказ)
 
   // ── Геометрија ──
   const wlen = (w) => Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
@@ -86,9 +92,11 @@
     return { t, x: w.x1 + ux * t, y: w.y1 + uy * t };
   }
 
+  // На плочата точките се лепат и на аглите на надворешните ѕидови од првиот кат
+  const snapWalls = () => (isSlab() ? F().walls.concat(st.plan.floors[0].walls.filter((w) => w.kind === 'out')) : F().walls);
   function nearPoint(px, py, skip) {
     let best = null, bd = SNAP_PX;
-    for (const w of F().walls) {
+    for (const w of snapWalls()) {
       if (skip && skip.has(w)) continue;
       for (const [x, y] of [[w.x1, w.y1], [w.x2, w.y2]]) {
         const [sx, sy] = toS(x, y);
@@ -407,6 +415,9 @@
     if (sum('stairs')) { p.SKALI = 1; p.SKALI_M = r2(sum('stairM')); }
     const RG = roofGeom();
     if (RG) { p.ROOF = r2(RG.area); p.SIMS = r2(RG.sims); }
+    // Бетонска плоча — само ако параметарот постои во калкулаторот
+    const slabA = outerArea(st.plan.slab);
+    if (slabA && SLAB_KEY in st.opts.labels) p[SLAB_KEY] = r2(slabA);
     // Калкулаторот има еден под за целата куќа → преовладува поголемата површина
     const lam = sum('laminat'), pl = sum('plochki');
     if (lam || pl) { p.LAMINAT = lam >= pl ? 1 : 0; p.PLOCHKI = lam >= pl ? 0 : 1; }
@@ -434,7 +445,7 @@
   function undo() {
     if (!st.hist.length) return;
     st.plan = JSON.parse(st.hist.pop());
-    if (st.floor >= st.plan.floors.length) st.floor = 0;
+    if (!isSlab() && st.floor >= st.plan.floors.length) st.floor = 0;
     st.sel = null; st.draw = null;
     renderFloors();
     refresh();
@@ -512,12 +523,19 @@
       <pattern id="plG2" width="${g2}" height="${g2}" patternUnits="userSpaceOnUse" x="${st.view.tx}" y="${st.view.ty}">
         <path d="M ${g2} 0 L 0 0 0 ${g2}" fill="none" stroke="#ddd5c8" stroke-width="1"/></pattern>
       <pattern id="plHatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-        <rect width="8" height="8" fill="rgba(150,175,120,.10)"/><line x1="0" y1="0" x2="0" y2="8" stroke="rgba(110,140,85,.45)" stroke-width="1.2"/></pattern></defs>`;
+        <rect width="8" height="8" fill="rgba(150,175,120,.10)"/><line x1="0" y1="0" x2="0" y2="8" stroke="rgba(110,140,85,.45)" stroke-width="1.2"/></pattern>
+      <pattern id="plConc" width="14" height="14" patternUnits="userSpaceOnUse">
+        <rect width="14" height="14" fill="rgba(150,145,138,.22)"/><circle cx="3" cy="4" r="1" fill="rgba(110,105,98,.35)"/><circle cx="10" cy="10" r=".8" fill="rgba(110,105,98,.3)"/></pattern></defs>`;
     if (g1 >= 5) h += '<rect width="100%" height="100%" fill="url(#plG1)"/>';
     h += '<rect width="100%" height="100%" fill="url(#plG2)"/>';
 
+    // Плоча: надворешните ѕидови и бањите од првиот кат (за порамнување и за водоводот)
+    if (isSlab()) {
+      for (const P of outerLoops(f) || []) h += `<polygon points="${P.map(([x, y]) => toS(x, y).join(',')).join(' ')}" fill="url(#plConc)"/>`;
+      h += slabGhost();
+    }
     // Другиот кат — блед, за порамнување
-    if (st.plan.floors.length === 2) {
+    else if (st.plan.floors.length === 2) {
       const o = st.plan.floors[1 - st.floor];
       for (const w of o.walls) {
         const [x1, y1] = toS(w.x1, w.y1), [x2, y2] = toS(w.x2, w.y2);
@@ -548,12 +566,13 @@
       }
     }
 
-    // Ѕидови
+    // Ѕидови (на плочата: ивица)
+    const thick = (w) => (isSlab() ? SLAB_EDGE : THICK[w.kind]);
     for (const w of f.walls) {
       const [x1, y1] = toS(w.x1, w.y1), [x2, y2] = toS(w.x2, w.y2), sel = isSel('wall', w.id);
-      const col = sel ? 'var(--accent)' : w.kind === 'out' ? '#3b3732' : '#8d867c';
-      h += `<g data-hit="wall:${w.id}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${Math.max(3, THICK[w.kind] * s)}" stroke-linecap="square"/>
-        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="${Math.max(14, THICK[w.kind] * s + 8)}"/></g>`;
+      const col = sel ? 'var(--accent)' : isSlab() ? '#6f6a63' : w.kind === 'out' ? '#3b3732' : '#8d867c';
+      h += `<g data-hit="wall:${w.id}"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="${Math.max(3, thick(w) * s)}" stroke-linecap="square"/>
+        <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="${Math.max(14, thick(w) * s + 8)}"/></g>`;
     }
     // Врати и прозори
     for (const d of f.doors) { const w = wallById(f, d.wall); if (w) h += doorSvg(w, d, isSel('door', d.id)); }
@@ -581,7 +600,7 @@
     }
 
     // Мерки на ѕидовите (cm)
-    for (const w of f.walls) h += dimLabel(w.x1, w.y1, w.x2, w.y2, THICK[w.kind], isSel('wall', w.id));
+    for (const w of f.walls) h += dimLabel(w.x1, w.y1, w.x2, w.y2, thick(w), isSel('wall', w.id));
 
     // Рачки за аглите на избраниот ѕид
     if (st.tool === 'select' && st.sel && st.sel.type === 'wall') {
@@ -596,8 +615,9 @@
     if (st.draw && st.draw.cur) {
       const a = st.draw.from, b = st.draw.cur;
       const [x1, y1] = toS(a.x, a.y), [x2, y2] = toS(b.x, b.y);
-      h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--accent)" stroke-opacity=".55" stroke-width="${Math.max(3, THICK[st.draw.kind] * s)}" stroke-linecap="square"/>`;
-      h += dimLabel(a.x, a.y, b.x, b.y, THICK[st.draw.kind], true);
+      const T = isSlab() ? SLAB_EDGE : THICK[st.draw.kind];
+      h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--accent)" stroke-opacity=".55" stroke-width="${Math.max(3, T * s)}" stroke-linecap="square"/>`;
+      h += dimLabel(a.x, a.y, b.x, b.y, T, true);
       h += `<circle cx="${x1}" cy="${y1}" r="4" fill="var(--accent)"/>`;
     }
     if (st.cursor && (st.tool === 'out' || st.tool === 'in')) {
@@ -614,6 +634,24 @@
     }
     svg.innerHTML = h;
     $('#plTyped').textContent = st.draw && st.typed ? 'Должина: ' + st.typed + ' cm — Enter' : '';
+  }
+
+  // Бањите на првиот кат — пресметани од неговите ѕидови и простории
+  const slabToilets = () => layout(st.plan.floors[0]).faces.filter((fc) => fc.room && fc.room.type === 'banja');
+  function slabGhost() {
+    let h = '';
+    for (const w of st.plan.floors[0].walls) {
+      if (w.kind !== 'out') continue;
+      const [x1, y1] = toS(w.x1, w.y1), [x2, y2] = toS(w.x2, w.y2);
+      h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#c9c1b3" stroke-width="${Math.max(2, THICK.out * st.view.s)}" stroke-linecap="square" stroke-dasharray="6 6"/>`;
+    }
+    const R = ROOMS.banja;
+    for (const fc of slabToilets()) {
+      h += `<polygon points="${fc.pts.map(([x, y]) => toS(x, y).join(',')).join(' ')}" fill="${R.fill}" stroke="${R.stroke}" stroke-width="1.5" stroke-dasharray="5 3"/>`;
+      const [x, y] = toS(fc.room.x, fc.room.y);
+      h += `<text x="${x}" y="${y - 6}" class="pl-rlabel" text-anchor="middle">${esc(R.label)}<tspan x="${x}" dy="15" class="pl-rarea">${fmt(fc.area)} m² · прв кат</tspan></text>`;
+    }
+    return h;
   }
 
   function stairSvg(x, f, sel) {
@@ -701,6 +739,7 @@
 
   // ── Страничен панел: избран елемент + збир + што ќе се пополни ──
   function renderPanel() {
+    if (isSlab()) return renderSlabPanel();
     const f = F();
     let h = '';
     const sel = st.sel;
@@ -793,6 +832,33 @@
       ? keys.map((k) => row(esc(st.opts.labels[k] || k), yn.includes(k) ? (patch[k] ? 'да' : 'не') : fmt(patch[k]))).join('')
         + (wr.length ? row('Дограма (ги заменува стандардните редови)', wr.reduce((s, r) => s + r.qty, 0) + ' ком') : '')
       : '<p class="hint">Нацртај ѕидови, врати, прозори, простории или тераси.</p>'}</div>`;
+    panel.innerHTML = h;
+    wirePanel();
+  }
+
+  // Панел за бетонската плоча: ивица (должина), површина, бањи од прв кат, копирање на контурата
+  function renderSlabPanel() {
+    const f = F(), sel = st.sel, row = (l, v) => `<div class="pl-row"><span>${l}</span><b>${v}</b></div>`;
+    let h = '';
+    const w = sel && sel.type === 'wall' && wallById(f, sel.id);
+    if (w) h += `<div class="pl-box"><h5>Ивица на плоча</h5>
+      <div class="field"><label>Должина <span class="unit">cm</span></label><input type="number" min="5" step="1" id="plLen" value="${Math.round(wlen(w))}"></div>
+      <button class="btn danger small" id="plDel">Избриши ивица</button></div>`;
+    const base = st.plan.floors[0].walls.some((x) => x.kind === 'out');
+    if (!f.walls.length) {
+      h += `<div class="pl-box"><h5>Нова плоча</h5><p class="hint">Нацртај ја контурата на плочата или почни од надворешните ѕидови на првиот кат.</p>
+        ${base ? '<button class="btn ghost small" id="plCopy">Копирај контура од прв кат</button>' : ''}</div>`;
+    }
+    const A = outerArea(f), len = f.walls.reduce((a, x) => a + wlen(x), 0) / 100, wc = slabToilets();
+    h += `<div class="pl-box"><h5>Бетонска плоча</h5>
+      ${row('Површина', A != null ? fmt(A) + ' m²' : f.walls.length ? '<span class="pl-warn">не е затворена</span>' : '—')}
+      ${row('Обем', fmt(len) + ' m')}
+      ${row('Бањи / WC од прв кат', wc.length + (wc.length ? ' · ' + fmt(wc.reduce((a, fc) => a + fc.area, 0)) + ' m²' : ''))}
+      ${SLAB_KEY in st.opts.labels ? '' : `<p class="hint pl-warn">Параметарот ${SLAB_KEY} не постои во калкулаторот — површината нема да се пополни.</p>`}</div>`;
+    const patch = buildPatch();
+    h += `<div class="pl-box"><h5>Ќе се пополни во калкулаторот</h5>${SLAB_KEY in patch
+      ? row(esc(st.opts.labels[SLAB_KEY] || SLAB_KEY), fmt(patch[SLAB_KEY]))
+      : '<p class="hint">Затвори ја контурата на плочата.</p>'}</div>`;
     panel.innerHTML = h;
     wirePanel();
   }
@@ -894,15 +960,31 @@
     });
     return {
       floors,
+      // Бетонска плоча под куќата (контура од табот „Бетонска плоча“)
+      slab: outerLoops(st.plan.slab) || [],
+      // Материјали од админ → „3D материјали“ (веќе со применети правила за оваа понуда)
+      mat3d: st.opts.mat3d || null,
       roof: RG && { top: RG.top, flat: st.plan.roof.type === 'flat', parts: RG.parts.map((p) => ({ outline: p.outline, planes: p.planes, pieces: p.pieces })) },
     };
   }
 
+  // На плочата: само избор и цртање ивица
+  function syncToolbar() {
+    const slab = isSlab();
+    root.querySelectorAll('.pl-tool[data-tool], .pl-group').forEach((el) => {
+      el.style.display = slab && !['select', 'out'].includes(el.dataset.tool) ? 'none' : '';
+    });
+    const out = root.querySelector('.pl-tool[data-tool="out"] .pl-tl');
+    if (out) out.textContent = slab ? 'Ивица на плоча' : 'Надворешен ѕид';
+  }
+
   function setTool(t) {
+    if (isSlab() && !['select', 'out'].includes(t)) t = 'out';
+    syncToolbar();
     st.tool = t; st.draw = null; st.typed = ''; st.ghost = null; st.hover = null;
     if (t !== 'select' && !roomTool(t)) st.sel = null;
     root.querySelectorAll('.pl-tool[data-tool]').forEach((b) => b.classList.toggle('on', b.dataset.tool === t));
-    $('#plHint').textContent = HINTS[st.view3d ? '3d' : roomTool(t) ? 'room' : t];
+    $('#plHint').textContent = HINTS[st.view3d ? '3d' : roomTool(t) ? 'room' : isSlab() && t === 'out' ? 'slab' : t];
     svg.style.cursor = t === 'select' ? 'default' : 'crosshair';
     refresh();
   }
@@ -913,7 +995,7 @@
   function fit() {
     const f = F(), W = svg.clientWidth || 800, H = svg.clientHeight || 500;
     const xs = [], ys = [];
-    for (const fl of st.plan.floors) for (const w of fl.walls) { xs.push(w.x1, w.x2); ys.push(w.y1, w.y2); }
+    for (const fl of [...st.plan.floors, st.plan.slab]) for (const w of fl.walls) { xs.push(w.x1, w.x2); ys.push(w.y1, w.y2); }
     for (const z of [...f.terraces, ...f.stairs]) { xs.push(z.x, z.x + z.w); ys.push(z.y, z.y + z.h); }
     if (!xs.length) { st.view = { s: 0.5, tx: 60, ty: 60 }; return; }
     const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
@@ -1121,7 +1203,7 @@
       if (!l) return `<div class="pl-group">${k}</div>`;
       const R = ROOMS[roomTool(k)];
       const sw = R ? ` style="background:${R.fill};border:1px solid ${R.stroke}"` : '';
-      return `<button type="button" class="pl-tool pl-t-${R ? 'room' : k}" data-tool="${k}"><i${sw}></i>${l}</button>`;
+      return `<button type="button" class="pl-tool pl-t-${R ? 'room' : k}" data-tool="${k}"><i${sw}></i><span class="pl-tl">${l}</span></button>`;
     }).join('');
     root.innerHTML = `<div class="modal pl-modal">
       <div class="modal-head"><h3>План на куќа</h3><div class="pl-floors" id="plFloors"></div>
@@ -1183,7 +1265,8 @@
   function renderFloors() {
     const box = $('#plFloors'), n = st.plan.floors.length;
     box.innerHTML = `<div class="pl-tabs">${st.plan.floors.map((_, i) => `<button type="button" class="pl-tab${st.floor === i ? ' on' : ''}" data-floor="${i}">${floorName(i)}${i ? '<span class="pl-tab-x" data-rm title="Отстрани го вториот кат">×</span>' : ''}</button>`).join('')}
-      ${n < 2 ? '<button type="button" class="pl-tab pl-tab-add" data-add>+ Втор кат</button>' : ''}</div>`;
+      ${n < 2 ? '<button type="button" class="pl-tab pl-tab-add" data-add>+ Втор кат</button>' : ''}
+      <button type="button" class="pl-tab pl-tab-slab${isSlab() ? ' on' : ''}" data-slab>Бетонска плоча</button></div>`;
     box.querySelectorAll('[data-floor]').forEach((b) => {
       b.onclick = (e) => {
         if (e.target.closest('[data-rm]')) {
@@ -1194,9 +1277,16 @@
           st.floor = 0;
         } else st.floor = Number(b.dataset.floor);
         st.sel = null; st.draw = null;
-        renderFloors(); fit(); refresh();
+        renderFloors(); fit();
+        if (st.view3d) refresh(); else setTool(st.tool);
       };
     });
+    box.querySelector('[data-slab]').onclick = () => {
+      st.floor = SLAB; st.sel = null; st.draw = null;
+      renderFloors(); fit();
+      // Празна плоча → веднаш цртање на ивицата
+      if (st.view3d) refresh(); else setTool(st.plan.slab.walls.length ? 'select' : 'out');
+    };
     const add = box.querySelector('[data-add]');
     if (add) add.onclick = () => {
       snapshot();
@@ -1230,6 +1320,7 @@
     // Калкулаторот бара два ката → табот за втор кат е веќе отворен
     if (opts.floors === 2 && p.floors.length < 2) p.floors.push(emptyFloor(hDef(1)));
     p.roof = Object.assign({}, ROOF_DEF, p.roof);
+    p.slab = Object.assign(emptyFloor(), p.slab, { doors: [], windows: [], rooms: [], terraces: [], stairs: [] });
     st = { plan: p, floor: 0, tool: 'out', view3d: false, view: { s: 0.5, tx: 60, ty: 60 }, sel: null, draw: null, drag: null, typed: '', hist: [], dirty: false,
       opts: Object.assign({ floors: 1, labels: {}, eurM2: 150 }, opts), onApply };
     root.classList.add('open');

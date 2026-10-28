@@ -41,6 +41,21 @@ function saveDb() {
   fs.writeFileSync(tmp, JSON.stringify(db, null, 2));
   fs.renameSync(tmp, DB_FILE);
 }
+// ── 3D текстури што ги качува админот: до базата (на постојаниот диск), не во public/ ──
+const UTEX_DIR = path.join(path.dirname(DB_FILE), 'tex');
+fs.mkdirSync(UTEX_DIR, { recursive: true });
+const UTEX_NAME = /^[a-z0-9]{6,24}_(color|normal)\.webp$/;
+// Резервната копија (и pull-db) ги носи текстурите во db.textures3d → се запишуваат како датотеки
+function unpackTextures(d) {
+  if (!d.textures3d || typeof d.textures3d !== 'object') return false;
+  for (const [name, b64] of Object.entries(d.textures3d)) {
+    if (UTEX_NAME.test(name) && typeof b64 === 'string') fs.writeFileSync(path.join(UTEX_DIR, name), Buffer.from(b64, 'base64'));
+  }
+  delete d.textures3d;
+  return true;
+}
+if (unpackTextures(db)) saveDb();
+
 // Одложено зачувување — избегнува запис на дискот при секој настан (аналитика)
 let savePending = false;
 function scheduleSave() {
@@ -161,10 +176,10 @@ function json(res, code, obj) {
   res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8' });
   res.end(body);
 }
-function readBody(req) {
+function readBody(req, max = 5e6) {
   return new Promise((resolve, reject) => {
     let data = '';
-    req.on('data', (c) => { data += c; if (data.length > 5e6) req.destroy(); });
+    req.on('data', (c) => { data += c; if (data.length > max) req.destroy(); });
     req.on('end', () => {
       try { resolve(data ? JSON.parse(data) : {}); }
       catch { reject(new Error('bad json')); }
@@ -190,6 +205,23 @@ function publicConfig() {
     materials: db.materials,
     windowsDefaults: db.windowsDefaults,
   };
+}
+
+// Почетен шаблон за понуда од data/offer.js. Секоја секција и ред добиваат постојан id
+// еднаков на стариот позициски (s2, s2i0, s2p1, s2n0) — така зачуваните понуди
+// си ги задржуваат исклучените/подредените редови и по уредување на шаблонот.
+function seedOffer() {
+  delete require.cache[require.resolve('./data/offer.js')];
+  const src = JSON.parse(JSON.stringify(require('./data/offer.js')));
+  for (const v of ['turnkey', 'grey']) {
+    (src[v].sections || []).forEach((sec, si) => {
+      sec.id = 's' + si;
+      (sec.items || []).forEach((x, j) => { x.id = `s${si}i${j}`; });
+      (sec.specs || []).forEach((x, j) => { x.id = `s${si}p${j}`; });
+      sec.notes = (sec.notes || []).map((n, j) => (typeof n === 'string' ? { id: `s${si}n${j}`, text: n } : n));
+    });
+  }
+  return src;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -240,8 +272,9 @@ const server = http.createServer(async (req, res) => {
       // Цртеж на основата (админ калкулатор) — се чува за подоцнежно уредување
       if (body.plan && typeof body.plan === 'object' && Array.isArray(body.plan.floors) && JSON.stringify(body.plan).length < 300000) quote.plan = body.plan;
       // Исклучени елементи од печатената понуда (клуч на рака / сива фаза), пр. { turnkey: { s3i1: true } }
+      // id-ата се од шаблонот: стари позициски (s3, s3i1) или нови (x…), додадени `${секција}c<id>`
       if (body.offerExclude && typeof body.offerExclude === 'object') {
-        const clean = (m) => Object.fromEntries(Object.keys(m && typeof m === 'object' ? m : {}).filter((k) => /^s\d+([ipn]\d+|c[a-z0-9]{1,20})?$/.test(k)).slice(0, 2000).map((k) => [k, true]));
+        const clean = (m) => Object.fromEntries(Object.keys(m && typeof m === 'object' ? m : {}).filter((k) => /^[a-z0-9]{1,48}$/.test(k)).slice(0, 2000).map((k) => [k, true]));
         quote.offerExclude = { turnkey: clean(body.offerExclude.turnkey), grey: clean(body.offerExclude.grey) };
       }
       // Рачно додадени елементи по секција, пр. { turnkey: { s3: [{ id, text }] } }
@@ -249,7 +282,7 @@ const server = http.createServer(async (req, res) => {
         const clean = (m) => {
           const out = {};
           for (const k of Object.keys(m && typeof m === 'object' ? m : {})) {
-            if (!/^s\d+$/.test(k) || !Array.isArray(m[k])) continue;
+            if (!/^[a-z0-9]{1,24}$/.test(k) || !Array.isArray(m[k])) continue;
             const list = m[k].filter((x) => x && /^[a-z0-9]{1,20}$/.test(x.id) && String(x.text || '').trim())
               .slice(0, 100).map((x) => ({ id: x.id, text: String(x.text).trim().slice(0, 300) }));
             if (list.length) out[k] = list;
@@ -259,7 +292,7 @@ const server = http.createServer(async (req, res) => {
         quote.offerExtra = { turnkey: clean(body.offerExtra.turnkey), grey: clean(body.offerExtra.grey) };
       }
       // Избришани стандардни елементи и редослед по секција, пр. { turnkey: { s3i1: true } } / { turnkey: { s3: ['s3i2', 's3i0'] } }
-      const partId = /^s\d+([ipn]\d+|c[a-z0-9]{1,20})$/;
+      const partId = /^[a-z0-9]{1,48}$/; // стари (s3i1) и нови (x…) id-а од шаблонот
       if (body.offerDeleted && typeof body.offerDeleted === 'object') {
         const clean = (m) => Object.fromEntries(Object.keys(m && typeof m === 'object' ? m : {}).filter((k) => partId.test(k)).slice(0, 2000).map((k) => [k, true]));
         quote.offerDeleted = { turnkey: clean(body.offerDeleted.turnkey), grey: clean(body.offerDeleted.grey) };
@@ -268,7 +301,7 @@ const server = http.createServer(async (req, res) => {
         const clean = (m) => {
           const out = {};
           for (const k of Object.keys(m && typeof m === 'object' ? m : {})) {
-            if (/^s\d+$/.test(k) && Array.isArray(m[k])) out[k] = m[k].filter((x) => typeof x === 'string' && partId.test(x)).slice(0, 200);
+            if (/^[a-z0-9]{1,24}$/.test(k) && Array.isArray(m[k])) out[k] = m[k].filter((x) => typeof x === 'string' && partId.test(x)).slice(0, 200);
           }
           return out;
         };
@@ -335,16 +368,59 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { daily: out });
       }
 
-      // Шаблони за ПОНУДА (клуч на рака / сива фаза) — само за админ
+      // Шаблони за ПОНУДА (клуч на рака / сива фаза) — само за админ.
+      // Се уредуваат во табот „Понуда“ и се чуваат во базата; додека не се зачуваат,
+      // се чита почетниот шаблон од data/offer.js.
+      // 3D материјали: библиотека, кој дел од куќата што користи, правила по параметар
+      if (what === 'mat3d' && req.method === 'GET') return json(res, 200, db.mat3d || null);
+      if (what === 'mat3d' && req.method === 'PUT') {
+        const body = await readBody(req);
+        if (!body || !Array.isArray(body.library) || typeof body.slots !== 'object' || !Array.isArray(body.rules)) {
+          return json(res, 400, { error: 'Неважечки 3D материјали.' });
+        }
+        db.mat3d = body;
+        saveDb();
+        return json(res, 200, { ok: true });
+      }
+      // Качување текстура: { id?, kind: 'color'|'normal', data: base64 webp } → { id }
+      if (what === 'tex' && req.method === 'POST') {
+        const body = await readBody(req, 8e6);
+        const id = body.id && /^[a-z0-9]{6,24}$/.test(body.id) ? body.id : crypto.randomBytes(6).toString('hex');
+        if (!['color', 'normal'].includes(body.kind) || typeof body.data !== 'string') return json(res, 400, { error: 'Неважечка текстура.' });
+        const buf = Buffer.from(body.data, 'base64');
+        // WebP: RIFF....WEBP
+        if (buf.length < 12 || buf.toString('ascii', 0, 4) !== 'RIFF' || buf.toString('ascii', 8, 12) !== 'WEBP') return json(res, 400, { error: 'Сликата мора да е WebP.' });
+        fs.writeFileSync(path.join(UTEX_DIR, `${id}_${body.kind}.webp`), buf);
+        return json(res, 200, { id });
+      }
+      const delTex = what.match(/^tex\/([a-z0-9]{6,24})$/);
+      if (delTex && req.method === 'DELETE') {
+        for (const k of ['color', 'normal']) fs.rmSync(path.join(UTEX_DIR, `${delTex[1]}_${k}.webp`), { force: true });
+        return json(res, 200, { ok: true });
+      }
+
       if (what === 'offer' && req.method === 'GET') {
-        delete require.cache[require.resolve('./data/offer.js')];
-        return json(res, 200, require('./data/offer.js'));
+        return json(res, 200, db.offer || seedOffer());
+      }
+      if (what === 'offer' && req.method === 'PUT') {
+        const body = await readBody(req);
+        const okVariant = (v) => v && typeof v === 'object' && Array.isArray(v.sections);
+        if (!body || !okVariant(body.turnkey) || !okVariant(body.grey) || !Array.isArray(body.payment)) {
+          return json(res, 400, { error: 'Неважечки шаблон за понуда.' });
+        }
+        db.offer = body;
+        saveDb();
+        return json(res, 200, { ok: true });
       }
 
       // Извоз на целата база (за резервна копија / пренос на друг сервер) — без лозинката
       if (what === 'export' && req.method === 'GET') {
         const { adminPassword, ...settings } = db.settings;
         const dump = Object.assign({}, db, { settings });
+        // Качените 3D текстури одат со резервната копија
+        const tx = {};
+        for (const f of fs.readdirSync(UTEX_DIR)) if (UTEX_NAME.test(f)) tx[f] = fs.readFileSync(path.join(UTEX_DIR, f)).toString('base64');
+        if (Object.keys(tx).length) dump.textures3d = tx;
         const fname = 'mda-backup-' + new Date().toISOString().slice(0, 10) + '.json';
         res.writeHead(200, {
           'Content-Type': 'application/json; charset=utf-8',
@@ -354,7 +430,7 @@ const server = http.createServer(async (req, res) => {
       }
       // Внес на резервна копија — ја заменува целата база (ја задржува тековната лозинка)
       if (what === 'import' && req.method === 'POST') {
-        const body = await readBody(req);
+        const body = await readBody(req, 80e6);
         if (!body || !Array.isArray(body.materials) || !Array.isArray(body.categories) || !Array.isArray(body.inputs)) {
           return json(res, 400, { error: 'Неважечка резервна копија (недостасуваат materials/categories/inputs).' });
         }
@@ -363,6 +439,7 @@ const server = http.createServer(async (req, res) => {
         db.settings = Object.assign({}, body.settings || {}, { adminPassword: keepPw });
         db.quotes = Array.isArray(db.quotes) ? db.quotes : [];
         db.inquiries = Array.isArray(db.inquiries) ? db.inquiries : [];
+        unpackTextures(db);
         // Внесената база може да е од постара верзија (пр. извоз од продукција пред
         // новите параметри) — мигрирај ја веднаш, инаку измените во кодот се губат
         // до следното рестартирање на серверот.
@@ -393,6 +470,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p.startsWith('/api/')) return json(res, 404, { error: 'not found' });
+
+    // Качени 3D текстури (јавни, како и останатите слики)
+    const ut = p.match(/^\/utex\/([^/]+)$/);
+    if (ut) {
+      if (!UTEX_NAME.test(ut[1])) { res.writeHead(404); return res.end(); }
+      return fs.readFile(path.join(UTEX_DIR, ut[1]), (err, data) => {
+        if (err) { res.writeHead(404); return res.end('404'); }
+        res.writeHead(200, { 'Content-Type': 'image/webp', 'Cache-Control': 'public, max-age=31536000, immutable' });
+        res.end(data);
+      });
+    }
 
     // ── Статични датотеки ──
     let file = p === '/' ? '/index.html' : p;

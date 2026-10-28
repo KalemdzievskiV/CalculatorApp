@@ -184,7 +184,8 @@
     // Влезни променливи: стандардни вредности + прегазени од state
     const vars = {};
     for (const inp of db.inputs) {
-      if (inp.type === 'derived') continue;
+      // Изведените се пресметуваат подоцна; „избор" е само текст за понудата, без вредност во формулите
+      if (inp.type === 'derived' || inp.type === 'select') continue;
       let v = state.inputs && state.inputs[inp.key] != null ? state.inputs[inp.key] : inp.def;
       vars[inp.key] = Number(v) || 0;
     }
@@ -288,7 +289,7 @@
     // Секој параметар со target:'windows' се множи во цената на прозорите.
     let winFactor = 1;
     for (const inp of db.inputs) {
-      if (inp.target !== 'windows') continue;
+      if (inp.target !== 'windows' || inp.type === 'select') continue;
       const f = vars[inp.key];
       if (f > 0) winFactor *= f;
     }

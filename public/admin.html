@@ -71,6 +71,8 @@
       <button data-tab="analytics">АНАЛИТИКА</button>
       <button data-tab="calc">КАЛКУЛАТОР</button>
       <button data-tab="explain">ПРЕСМЕТКА</button>
+      <button data-tab="offer">ШАБЛОН ПОНУДА</button>
+      <button data-tab="mat3d">3D МАТЕРИЈАЛИ</button>
       <button data-tab="quotes">ПОНУДИ</button>
       <button data-tab="inquiries">БАРАЊА</button>
       <button data-tab="settings">ПОДЕСУВАЊА</button>
@@ -126,6 +128,7 @@
           <option value="boolean">Да / не</option>
           <option value="price">Цена</option>
           <option value="factor">Коефициент</option>
+          <option value="select">Избор</option>
           <option value="derived">Изведен</option>
         </select>
         <select id="inpUseFilter">
@@ -256,6 +259,93 @@
     </div>
 
     <!-- ПОНУДИ -->
+    <!-- ШАБЛОН ПОНУДА -->
+    <div class="tab-panel" id="tab-offer">
+      <div class="toolbar">
+        <div class="seg ot-variant" id="otVariant">
+          <button type="button" class="seg-btn on" data-v="turnkey">Клуч на рака</button>
+          <button type="button" class="seg-btn" data-v="grey">Сива фаза</button>
+        </div>
+        <span class="hint" id="otCount"></span>
+        <span style="flex: 1;"></span>
+        <button class="btn ghost small" id="otOpenAll">Отвори ги сите</button>
+        <button class="btn accent small" id="otAddSec">+ Нова секција</button>
+      </div>
+      <p class="hint tab-hint">Секциите и редовите што се печатат во понудата. Вредноста на редот може да биде впишан текст, параметар од калкулаторот (пр. паѓачко мени „Боја на врати“) или количина од материјали. Ред поврзан со параметар без вредност не се печати. Промените се зачувуваат автоматски.</p>
+      <div class="ot-grid">
+        <div id="otSections"></div>
+        <div class="ot-side">
+          <div class="card">
+            <div class="card-head"><h3>Заглавие и забелешки</h3><span class="hint" id="otVarName"></span></div>
+            <div class="card-body ot-form">
+              <div class="field"><label>Наслов</label><input type="text" data-head="title"></div>
+              <div class="field"><label>Поднаслов</label><input type="text" data-head="subtitle"></div>
+              <div class="field"><label>Воведен текст</label><textarea rows="3" data-head="desc"></textarea></div>
+              <div class="field"><label>Забелешка</label><textarea rows="3" data-head="note"></textarea></div>
+              <div class="field"><label>Предупредување <span class="unit">ситно, под забелешката</span></label><textarea rows="3" data-head="warning"></textarea></div>
+            </div>
+          </div>
+          <div class="card" style="margin-top: 16px;">
+            <div class="card-head"><h3>Плаќање и важност</h3><span class="hint">исто за двете понуди</span></div>
+            <div class="card-body ot-form">
+              <div id="otPay"></div>
+              <button class="btn ghost small" id="otAddPay" style="justify-self: start;">+ Рата</button>
+              <div class="field"><label>Важност на понудата <span class="unit">денови</span></label><input type="number" min="1" step="1" id="otValidity" style="max-width: 120px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3D МАТЕРИЈАЛИ -->
+    <div class="tab-panel" id="tab-mat3d">
+      <p class="hint tab-hint">Материјалите во 3D приказот на планот. Секој материјал е слика (текстура) + боја + сјај. Долу избери кој дел од куќата кој материјал го користи, и по желба правило: ако во калкулаторот е избрана одредена опција, делот добива друг материјал. Промените се зачувуваат автоматски. Бесплатни текстури: <a href="https://polyhaven.com/textures" target="_blank" rel="noopener">polyhaven.com</a>, <a href="https://ambientcg.com" target="_blank" rel="noopener">ambientcg.com</a> (симни „Color“ и „Normal GL“, 1K).</p>
+      <div class="m3-grid">
+        <div class="card">
+          <div class="card-head"><h3>Библиотека</h3><button class="btn accent small" id="m3Add">+ Нов материјал</button></div>
+          <div class="card-body"><div class="m3-lib" id="m3Lib"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3 id="m3EditTitle">Материјал</h3>
+            <span><button class="btn ghost small" id="m3Dup">Дуплирај</button> <button class="btn danger small" id="m3Del">Избриши</button></span></div>
+          <div class="card-body m3-edit">
+            <div class="m3-prev" id="m3Prev"></div>
+            <div class="m3-form">
+              <div class="field"><label>Име</label><input type="text" id="m3Name"></div>
+              <div class="field"><label>Текстура (слика)</label><select id="m3Tex"></select>
+                <div class="m3-up">
+                  <input type="file" id="m3FileC" accept="image/*" hidden><input type="file" id="m3FileN" accept="image/*" hidden>
+                  <button class="btn ghost small" id="m3UpC">⬆ Качи слика</button>
+                  <button class="btn ghost small" id="m3UpN" title="Normal map (GL) — дава длабочина на фугите и жлебовите">⬆ Качи релјеф</button>
+                  <span class="hint" id="m3UpNote"></span>
+                </div></div>
+              <div class="pm-row">
+                <div class="field"><label>Големина <span class="unit">cm</span></label><input type="number" min="5" step="1" id="m3Size"></div>
+                <div class="field"><label>Боја</label><input type="color" id="m3Color"></div>
+              </div>
+              <div class="m3-sliders">
+                <label>Осветленост <input type="range" min="0.3" max="2.5" step="0.05" id="m3Bright"><output></output></label>
+                <label>Мат ↔ сјај <input type="range" min="0" max="1" step="0.05" id="m3Rough"><output></output></label>
+                <label>Метал <input type="range" min="0" max="1" step="0.05" id="m3Metal"><output></output></label>
+                <label>Релјеф <input type="range" min="0" max="2" step="0.05" id="m3Bump"><output></output></label>
+              </div>
+              <div class="hint" id="m3Used"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="m3-grid" style="margin-top: 16px;">
+        <div class="card">
+          <div class="card-head"><h3>Делови од куќата</h3><button class="btn ghost small" id="m3Reset" title="Враќа ги стандардните материјали за сите делови">↺ Стандардно</button></div>
+          <div class="card-body"><div class="m3-slots" id="m3Slots"></div></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Правила по параметар</h3><button class="btn accent small" id="m3AddRule">+ Правило</button></div>
+          <div class="card-body"><p class="hint" style="margin-top:0;">Пр. „Боја на лим“ = Црна → Кров = Црн лим. Подоцнежното правило има предност.</p><div id="m3Rules"></div></div>
+        </div>
+      </div>
+    </div>
+
     <div class="tab-panel" id="tab-quotes">
       <div class="toolbar"><span class="hint">Кликни на понуда за да ја отвориш во калкулаторот (полн приказ + печатење).</span></div>
       <div class="card" style="overflow-x: auto;"><table class="data" id="quoteTable">
@@ -377,6 +467,7 @@
           <button type="button" class="seg-btn" data-t="boolean">Да / не<small>прекинувач</small></button>
           <button type="button" class="seg-btn" data-t="price">Цена<small>во денари</small></button>
           <button type="button" class="seg-btn" data-t="factor">Коефициент<small>множител ×</small></button>
+          <button type="button" class="seg-btn" data-t="select">Избор<small>паѓачко мени</small></button>
         </div>
       </div>
 
@@ -403,6 +494,11 @@
         </div>
         <div class="field pm-num"><label>Ед. мера</label><input type="text" id="pUnit" placeholder="m², ком…"></div>
         <div class="field pm-num"><label>Стандардна вредност</label><input type="number" step="any" min="0" id="pDef" value="0"></div>
+      </div>
+
+      <div class="field pm-select">
+        <label>Опции <span class="unit">по една во секој ред — не влегуваат во пресметката</span></label>
+        <textarea id="pOptions" rows="5" placeholder="пр.&#10;Бела&#10;Антрацит&#10;Дрво" spellcheck="false"></textarea>
       </div>
 
       <label class="toggle pm-bool" id="pDefOn"><span class="t-label">Стандардно вклучен</span><span class="knob"></span></label>

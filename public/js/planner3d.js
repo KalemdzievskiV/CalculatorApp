@@ -16,19 +16,58 @@
     'https://unpkg.com/three@0.160.0/build/three.module.js',
     'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js',
   ];
-  // Текстури (Poly Haven, CC0) — public/tex; [датотека, вистинска големина во cm]
+  // Вградени текстури (Poly Haven, CC0) — public/tex/<име>_color.webp и _normal.webp
   const TEX_BASE = new URL('../tex/', document.currentScript.src).href;
-  const TEX = {
-    plaster: ['painted_plaster_wall', 200], roof: ['corrugated_iron_02', 270], deck: ['wood_floor_deck', 180],
-    laminat: ['plank_flooring_02', 198], tiles: ['large_grey_tiles', 300], concrete: ['concrete_floor_02', 200],
-    pavers: ['concrete_pavers_02', 200], grass: ['leafy_grass', 200],
-  };
   const SKY = { top: 0x7fa9d6, horizon: 0xdde7ee };
   const COL = {
     wall: 0xf4f1ec, wallIn: 0xe9e4dc, slab: 0xc9c2b6, roof: 0x4b4f55, glass: 0x9cc3da, ground: 0xe8e4dc,
     laminat: 0xc9a47a, plochki: 0xdadfe2, garaza: 0xb9bcc1, deck: 0xb08657, stair: 0xd9cfbf, post: 0x8a8378,
   };
 
+  // ── 3D материјали: библиотека + кој дел од куќата кој материјал го користи ──
+  // Се уредуваат во админ → „3D материјали“. tex: '' (само боја), име од public/tex, или 'u:<id>' (качена).
+  // size = колку cm површина покрива една слика; bright ја множи бојата (>1 посветлува); bump = јачина на релјефот.
+  const M = (id, name, tex, size, color, o = {}) => Object.assign({ id, name, tex, normal: !!tex, size, color, bright: 1, rough: 0.9, metal: 0, bump: 1 }, o);
+  const DEFAULTS = {
+    library: [
+      M('plaster_white', 'Малтер бел (фасада)', 'painted_plaster_wall', 200, '#ffffff', { bright: 1.5, bump: 0.5 }),
+      M('plaster_in', 'Малтер внатрешен', 'painted_plaster_wall', 200, '#f2ece2', { bright: 1.2, bump: 0.4 }),
+      M('plaster_dark', 'Малтер темен (сокла)', 'painted_plaster_wall', 200, '#5f6369', { bump: 0.6 }),
+      M('roof_metal', 'Лим брановиден', 'corrugated_iron_02', 270, '#ffffff', { rough: 0.5, metal: 0.35 }),
+      M('metal_dark', 'Метал антрацит', '', 200, '#3c4046', { rough: 0.5, metal: 0.35 }),
+      M('gutter', 'Олук', '', 200, '#4e5258', { rough: 0.45, metal: 0.4 }),
+      M('concrete_light', 'Бетон светол', 'concrete_floor_02', 200, '#d6d2ca'),
+      M('concrete_base', 'Бетон (плоча)', 'concrete_floor_02', 200, '#b8b2a8', { rough: 0.95 }),
+      M('concrete_garage', 'Бетон (гаража)', 'concrete_floor_02', 200, '#ffffff'),
+      M('laminat', 'Ламинат', 'plank_flooring_02', 198, '#d4c8b8'),
+      M('stair_wood', 'Дрво светло (скали)', 'plank_flooring_02', 198, '#e2d2bc'),
+      M('tiles', 'Плочки сиви', 'large_grey_tiles', 300, '#ffffff', { bright: 1.15 }),
+      M('deck', 'Дрвена тераса', 'wood_floor_deck', 180, '#d2bca4'),
+      M('pvc_anthracite', 'ПВЦ антрацит', '', 200, '#3a3e44', { rough: 0.6 }),
+      M('door_out', 'Блиндирана врата темна', '', 200, '#34383e', { rough: 0.45, metal: 0.2 }),
+      M('door_in', 'Внатрешна врата бела', '', 200, '#f2efe9', { rough: 0.6 }),
+      M('pavers', 'Бехатон', 'concrete_pavers_02', 200, '#ece6dc', { bright: 1.2, rough: 0.95 }),
+      M('grass', 'Трева', 'leafy_grass', 200, '#8cc466', { rough: 1 }),
+    ],
+    slots: {
+      wallOut: 'plaster_white', wallOutIn: 'plaster_in', wallIn: 'plaster_in', plinth: 'plaster_dark', roof: 'roof_metal', fascia: 'metal_dark', gutter: 'gutter',
+      slab: 'concrete_light', baseSlab: 'concrete_base', laminat: 'laminat', plochki: 'tiles', garaza: 'concrete_garage',
+      deck: 'deck', stair: 'stair_wood', frame: 'pvc_anthracite', doorOut: 'door_out', doorIn: 'door_in', pavers: 'pavers', grass: 'grass',
+    },
+    rules: [],
+  };
+  const SLOTS = [
+    ['wallOut', 'Надворешни ѕидови — надвор (фасада)'], ['wallOutIn', 'Надворешни ѕидови — внатре'], ['plinth', 'Сокла'], ['wallIn', 'Внатрешни (преградни) ѕидови'],
+    ['roof', 'Кров'], ['fascia', 'Опшивка на кров'], ['gutter', 'Олуци'],
+    ['laminat', 'Под — ламинат'], ['plochki', 'Под — плочки'], ['garaza', 'Под — гаража'],
+    ['slab', 'Меѓукатна плоча'], ['baseSlab', 'Бетонска плоча'], ['stair', 'Скали'], ['deck', 'Тераса'],
+    ['frame', 'ПВЦ дограма'], ['doorOut', 'Влезна врата'], ['doorIn', 'Внатрешни врати'],
+    ['pavers', 'Плочки околу куќата'], ['grass', 'Трева'],
+  ];
+  // URL на сликата (color / normal) за материјал
+  const texUrl = (d, kind) => (d.tex.startsWith('u:') ? `/utex/${d.tex.slice(2)}_${kind}.webp${d.v ? '?v=' + d.v : ''}` : `${TEX_BASE}${d.tex}_${kind}.webp`);
+
+  let ground, matKey = '', previewR = null;
   let T = null, loading = null, holder, renderer, scene, camera, group, sun, model, needFit = true, ro;
   const show = { roof: true, upper: true };
   const cam = { theta: 0.75, phi: 1.0, dist: 3000, target: null };
@@ -74,7 +113,7 @@
     // Трева; малку назад по длабочина за да нема треперење со плочките околу куќата
     const gg = new T.PlaneGeometry(1e5, 1e5);
     scaleUV(gg, 1e5, 1e5);
-    const ground = new T.Mesh(gg, tmat('grass', 0x8cc466, { side: T.FrontSide, roughness: 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
+    ground = new T.Mesh(gg);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -21;
     ground.receiveShadow = true;
@@ -126,21 +165,29 @@
 
   // Текстура од public/tex, со повторување; UV-координатите во моделот се во cm
   const texCache = {};
-  function tex(name, kind, size) {
-    const key = name + '_' + kind;
+  function tex(url, kind, size, onLoad = requestDraw) {
+    const key = url + '|' + size;
     if (!texCache[key]) {
-      const t = new T.TextureLoader().load(TEX_BASE + key + '.webp', requestDraw, undefined, (e) => console.warn('Текстура не се вчита:', key, e));
+      const t = new T.TextureLoader().load(url, onLoad, undefined, (e) => console.warn('Текстура не се вчита:', url, e));
       t.wrapS = t.wrapT = T.RepeatWrapping;
       t.repeat.set(1 / size, 1 / size);
       if (kind === 'color') t.colorSpace = T.SRGBColorSpace;
-      t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      t.anisotropy = Math.min(8, (renderer || previewR).capabilities.getMaxAnisotropy());
       texCache[key] = t;
     }
     return texCache[key];
   }
-  function tmat(key, color, extra) {
-    const [name, size] = TEX[key];
-    return mat(color, Object.assign({ map: tex(name, 'color', size), normalMap: tex(name, 'normal', size) }, extra));
+  // Материјал од опис во библиотеката
+  function defMat(d, extra, onLoad) {
+    const o = { roughness: +d.rough, metalness: +d.metal };
+    if (d.tex) {
+      o.map = tex(texUrl(d, 'color'), 'color', +d.size || 200, onLoad);
+      if (d.normal) {
+        o.normalMap = tex(texUrl(d, 'normal'), 'normal', +d.size || 200, onLoad);
+        o.normalScale = new T.Vector2(+d.bump, +d.bump);
+      }
+    }
+    return mat(new T.Color(d.color || '#ffffff').multiplyScalar(+d.bright || 1), Object.assign(o, extra));
   }
   function scaleUV(g, su, sv) {
     const uv = g.attributes.uv;
@@ -283,22 +330,34 @@
       shape.holes.push(new T.Path(v2([[a, o.bottom], [b, o.bottom], [b, o.top], [a, o.top]])));
     }
     const g = new T.ExtrudeGeometry(shape, { depth: Tk, bevelEnabled: false });
-    const m4 = new T.Matrix4().makeBasis(new T.Vector3(ux, 0, uy), new T.Vector3(0, 1, 0), new T.Vector3(nx, 0, ny));
-    m4.setPosition(w.x1 - nx * Tk / 2, base, w.y1 - ny * Tk / 2);
-    g.applyMatrix4(m4);
-    mesh(g, material);
-
-    // Детали во рамнина на ѕидот: u по должина, v нагоре од base, n од средината на ѕидот
-    const L4 = new T.Matrix4().makeBasis(new T.Vector3(ux, 0, uy), new T.Vector3(0, 1, 0), new T.Vector3(nx, 0, ny));
-    L4.setPosition(w.x1, base, w.y1);
-    const lb = (u0, u1, v0, v1, n0, n1, m, shadow = true) => mesh(boxGeo(u0, u1, v0, v1, n0, n1).applyMatrix4(L4), m, shadow);
     // Надворешна страна: +1 ако n гледа нанадвор, −1 ако навнатре, 0 кај внатрешни ѕидови
     let s = 0;
     if (w.kind === 'out') {
       const px = (w.x1 + w.x2) / 2 + nx * Tk, py = (w.y1 + w.y2) / 2 + ny * Tk;
       s = (opts.loops || []).some((lp) => inPoly(lp, px, py)) ? -1 : 1;
     }
+    // Надворешен ѕид: двете големи страни добиваат посебен материјал (фасада надвор, малтер внатре).
+    // Капаците на ExtrudeGeometry се една група: прво страната z=0, па z=Tk — се делат на две.
+    let faceMat = material;
+    if (s && opts.inMat && g.groups.length === 2) {
+      const pos = g.attributes.position, [caps, sides] = g.groups;
+      let k = caps.start;
+      while (k < caps.start + caps.count && pos.getZ(k) < Tk / 2) k += 3;
+      g.clearGroups();
+      g.addGroup(caps.start, k - caps.start, 0);                 // страна −n
+      g.addGroup(k, caps.start + caps.count - k, 2);             // страна +n
+      g.addGroup(sides.start, sides.count, 1);                   // рабови и шпалетни
+      faceMat = s > 0 ? [opts.inMat, material, material] : [material, material, opts.inMat];
+    }
+    const m4 = new T.Matrix4().makeBasis(new T.Vector3(ux, 0, uy), new T.Vector3(0, 1, 0), new T.Vector3(nx, 0, ny));
+    m4.setPosition(w.x1 - nx * Tk / 2, base, w.y1 - ny * Tk / 2);
+    g.applyMatrix4(m4);
+    mesh(g, faceMat);
 
+    // Детали во рамнина на ѕидот: u по должина, v нагоре од base, n од средината на ѕидот
+    const L4 = new T.Matrix4().makeBasis(new T.Vector3(ux, 0, uy), new T.Vector3(0, 1, 0), new T.Vector3(nx, 0, ny));
+    L4.setPosition(w.x1, base, w.y1);
+    const lb = (u0, u1, v0, v1, n0, n1, m, shadow = true) => mesh(boxGeo(u0, u1, v0, v1, n0, n1).applyMatrix4(L4), m, shadow);
     const P = 7, D = Math.min(8, Tk - 2);  // профил на рамка (cm) и длабочина
     for (const o of ops) {
       const a = o.t - o.w / 2, b = o.t + o.w / 2, door = !o.glass;
@@ -438,33 +497,37 @@
     box(t.x - 10, t.x + t.w + 10, y1, y1 + 16, t.y - 10, t.y + t.h + 10, roofMat);
   }
 
-  let wallMat, wallInMat, slabMat, roofMat, fasciaMat, glassMat, deckMat, stairMat, postMat, floorMats, paverMat;
+  let wallMat, wallOutInMat, wallInMat, slabMat, baseSlabMat, roofMat, fasciaMat, glassMat, deckMat, stairMat, postMat, floorMats, paverMat;
   let frameMat, doorFrameInMat, doorOutMat, doorInMat, handleMat, sillMat, plinthMat, gutterMat;
+  // Ги гради материјалите од поставките (model.mat3d или стандардните); повторно само кога се менуваат
   function materials() {
-    // Бојата се множи со текстурата; >1 ја посветлува (малтерот во текстурата е сив)
-    wallMat = tmat('plaster', new T.Color().setScalar(1.5), { normalScale: new T.Vector2(0.5, 0.5) });
-    wallInMat = tmat('plaster', new T.Color(0xf2ece2).multiplyScalar(1.2), { normalScale: new T.Vector2(0.4, 0.4) });
-    slabMat = tmat('concrete', 0xd6d2ca);
-    roofMat = tmat('roof', 0xffffff, { roughness: 0.5, metalness: 0.35 });
-    fasciaMat = mat(0x3c4046, { roughness: 0.5, metalness: 0.35 });
+    const cfg = (model && model.mat3d) || DEFAULTS;
+    const key = JSON.stringify(cfg);
+    if (key === matKey && wallMat) return;
+    matKey = key;
+    const lib = {};
+    for (const d of DEFAULTS.library) lib[d.id] = d;
+    for (const d of cfg.library || []) lib[d.id] = d;
+    const at = (slot, extra) => defMat(lib[(cfg.slots || {})[slot]] || lib[DEFAULTS.slots[slot]], extra);
+    wallMat = at('wallOut'); wallOutInMat = at('wallOutIn'); wallInMat = at('wallIn'); plinthMat = at('plinth');
+    roofMat = at('roof'); fasciaMat = at('fascia'); gutterMat = at('gutter');
+    slabMat = at('slab'); baseSlabMat = at('baseSlab');
+    floorMats = { laminat: at('laminat'), plochki: at('plochki'), garaza: at('garaza') };
+    deckMat = at('deck'); stairMat = at('stair');
+    frameMat = at('frame'); doorOutMat = at('doorOut'); doorInMat = at('doorIn');
+    paverMat = at('pavers');
+    if (ground) ground.material = at('grass', { side: T.FrontSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+    // Ситни делови — не се уредуваат
     glassMat = mat(COL.glass, { transparent: true, opacity: 0.35, roughness: 0.05 });
-    deckMat = tmat('deck', 0xd2bca4); stairMat = tmat('laminat', 0xe2d2bc); postMat = mat(COL.post);
-    floorMats = { laminat: tmat('laminat', 0xd4c8b8), plochki: tmat('tiles', new T.Color().setScalar(1.15)), garaza: tmat('concrete', 0xffffff) };
-    paverMat = tmat('pavers', new T.Color(0xece6dc).multiplyScalar(1.2), { roughness: 0.95 });
-    // ПВЦ дограма антрацит, внатрешни врати бели, блиндирана влезна врата темна
-    frameMat = mat(0x3a3e44, { roughness: 0.6 });
+    postMat = mat(COL.post);
     doorFrameInMat = mat(0xeeebe5, { roughness: 0.7 });
-    doorOutMat = mat(0x34383e, { roughness: 0.45, metalness: 0.2 });
-    doorInMat = mat(0xf2efe9, { roughness: 0.6 });
     handleMat = mat(0xc9ccd0, { roughness: 0.3, metalness: 0.8 });
     sillMat = mat(0xb4b8bc, { roughness: 0.4, metalness: 0.5 });
-    plinthMat = tmat('plaster', 0x5f6369, { normalScale: new T.Vector2(0.6, 0.6) });
-    gutterMat = mat(0x4e5258, { roughness: 0.45, metalness: 0.4 });
   }
 
   function build() {
     if (!T || !scene || !model) return;
-    try { buildScene(); } catch (e) {
+    try { materials(); buildScene(); } catch (e) {
       console.error('3D грешка', e);
       say('3D моделот не може да се изгради: ' + e.message);
     }
@@ -476,6 +539,8 @@
     scene.add(group);
     const fl = model.floors, r = model.roof;
     const shown = fl.filter((_, i) => i === 0 || show.upper);
+    // Бетонска плоча: горе малку под подот на куќата (без треперење), дебелина 20 cm над тревата
+    for (const lp of model.slab || []) slab(lp, -2, 20, baseSlabMat);
     shown.forEach((f, i) => {
       // Плоча; над скалите од долниот кат има отвор
       const holes = i ? fl[i - 1].stairs.map((x) => [[x.x, x.y], [x.x + x.w, x.y], [x.x + x.w, x.y + x.h], [x.x, x.y + x.h]]) : [];
@@ -487,7 +552,7 @@
         mesh(g, floorMats[rm.floor] || floorMats.laminat, false);
       }
       const isTop = r && i === r.top && show.roof;
-      for (const w of f.walls) wall(w, f.base, f.h, isTop && w.kind === 'out' ? roofTop(r.parts, f.h) : null, w.kind === 'out' ? wallMat : wallInMat, { loops: f.loops, ground: i === 0 });
+      for (const w of f.walls) wall(w, f.base, f.h, isTop && w.kind === 'out' ? roofTop(r.parts, f.h) : null, w.kind === 'out' ? wallMat : wallInMat, { loops: f.loops, ground: i === 0, inMat: wallOutInMat });
       for (const x of f.stairs) stairs(x, f.base, f.h);
       for (const t of f.terraces) terrace(t, f.base, f.h);
     });
@@ -554,7 +619,50 @@
     build();
   }
 
+  // ── Преглед на еден материјал (админ → 3D материјали): плоча 3×3 m, коцка 1 m и топка ──
+  let pv = null;
+  async function preview(el, d) {
+    try { await load(); } catch (e) { el.textContent = '3D прегледот не може да се вчита.'; return; }
+    if (!pv) {
+      try { previewR = new T.WebGLRenderer({ antialias: true }); } catch (e) { el.textContent = 'WebGL не е достапен.'; return; }
+      previewR.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+      previewR.toneMapping = T.AgXToneMapping;
+      previewR.toneMappingExposure = 1.2;
+      const sc = new T.Scene();
+      sc.background = new T.Color(SKY.horizon);
+      const pm = new T.PMREMGenerator(previewR);
+      sc.environment = pm.fromScene(roomEnvironment(), 0.04).texture;
+      pm.dispose();
+      sc.add(new T.HemisphereLight(0xffffff, 0xa9ae96, 0.6));
+      const sunL = new T.DirectionalLight(0xffffff, 2.2);
+      sunL.position.set(300, 500, 200);
+      sc.add(sunL);
+      const cam3 = new T.PerspectiveCamera(35, 1, 10, 10000);
+      cam3.position.set(330, 300, 380);
+      cam3.lookAt(0, 20, 0);
+      const plate = new T.Mesh(new T.BoxGeometry(300, 10, 300));
+      plate.position.y = -5;
+      const cube = new T.Mesh(new T.BoxGeometry(100, 100, 100));
+      cube.position.set(-55, 50, -40);
+      const ball = new T.Mesh(new T.SphereGeometry(45, 48, 32));
+      ball.position.set(75, 45, 60);
+      // UV во cm, како во моделот (текстурата се повторува по вистинска големина)
+      scaleUV(plate.geometry, 300, 300); scaleUV(cube.geometry, 100, 100); scaleUV(ball.geometry, 280, 140);
+      sc.add(plate, cube, ball);
+      pv = { sc, cam: cam3, meshes: [plate, cube, ball], draw: () => previewR.render(sc, cam3) };
+    }
+    if (previewR.domElement.parentNode !== el) { el.innerHTML = ''; el.appendChild(previewR.domElement); }
+    const w = el.clientWidth || 260, h = el.clientHeight || 190;
+    previewR.setSize(w, h, false);
+    previewR.domElement.style.width = '100%'; previewR.domElement.style.height = '100%';
+    pv.cam.aspect = w / h; pv.cam.updateProjectionMatrix();
+    const m = defMat(d, {}, () => pv.draw());
+    for (const x of pv.meshes) x.material = m;
+    pv.draw();
+  }
+
   window.MDA3D = {
+    DEFAULTS, SLOTS, texUrl, preview,
     show: showModel,
     update(m) { model = m; build(); },
     hide() { if (holder) holder.classList.remove('on'); if (ro && holder) ro.unobserve(holder); needFit = true; },

@@ -140,11 +140,11 @@ table.data .cat-row td { background: var(--panel); font-family: var(--disp); fon
 /* Ексклузивен избор — визуелно е очигледно дека важи само една опција */
 .ci-exc, .ci-terrace { grid-column: span 2; }
 @media (max-width: 640px) { .ci-exc, .ci-terrace { grid-column: span 1; } }
-:is(.ci-exc, .ci-terrace, .pm-type) .seg { display: flex; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: #fff; }
-:is(.ci-exc, .ci-terrace, .pm-type) .seg-btn { flex: 1; padding: 8px 6px; font-family: var(--sans); font-size: 12px; line-height: 1.25; background: transparent; border: 0; border-right: 1px solid var(--line); cursor: pointer; color: var(--ink-soft); }
-:is(.ci-exc, .ci-terrace, .pm-type) .seg-btn:last-child { border-right: 0; }
-:is(.ci-exc, .ci-terrace, .pm-type) .seg-btn:hover { background: var(--panel); }
-:is(.ci-exc, .ci-terrace, .pm-type) .seg-btn.on { background: var(--accent); color: #fff; }
+:is(.ci-exc, .ci-terrace, .pm-type, .ot-variant) .seg { display: flex; border: 1px solid var(--line); border-radius: 2px; overflow: hidden; background: #fff; }
+:is(.ci-exc, .ci-terrace, .pm-type, .ot-variant) .seg-btn { flex: 1; padding: 8px 6px; font-family: var(--sans); font-size: 12px; line-height: 1.25; background: transparent; border: 0; border-right: 1px solid var(--line); cursor: pointer; color: var(--ink-soft); }
+:is(.ci-exc, .ci-terrace, .pm-type, .ot-variant) .seg-btn:last-child { border-right: 0; }
+:is(.ci-exc, .ci-terrace, .pm-type, .ot-variant) .seg-btn:hover { background: var(--panel); }
+:is(.ci-exc, .ci-terrace, .pm-type, .ot-variant) .seg-btn.on { background: var(--accent); color: #fff; }
 
 /* ═══ Модал за нов параметар ═══ */
 .pm-type .seg-btn { padding: 10px 6px; font-weight: 600; color: var(--ink); }
@@ -687,3 +687,69 @@ body.notice-closed .nav-hero { top: 0; }
 .os-sec .os-restore { justify-self: start; margin-top: 6px; background: none; border: none; color: var(--accent); font-size: 12px; cursor: pointer; padding: 0; }
 .os-sec .os-add { display: flex; gap: 8px; margin-top: 6px; }
 .os-sec .os-add input { flex: 1; font-size: 12.5px; padding: 6px 8px; }
+
+/* ── Шаблон понуда (админ) ── */
+.ot-variant { display: inline-flex; min-width: 260px; }
+.ot-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .ot-grid { grid-template-columns: 1fr; } }
+.ot-form { display: grid; gap: 12px; }
+.ot-form textarea { resize: vertical; }
+.ot-sec { border: 1px solid var(--line); border-radius: 3px; background: #fff; margin-bottom: 8px; }
+.ot-sec-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel); cursor: pointer; user-select: none; }
+.ot-sec.open .ot-sec-head { border-bottom: 1px solid var(--line); }
+.ot-sec-head .os-chev { color: var(--muted); font-size: 11px; width: 10px; transition: transform .15s; }
+.ot-sec.open .ot-sec-head .os-chev { transform: rotate(90deg); }
+.ot-sec-head .ot-title { flex: 1; font-weight: 600; font-size: 13px; }
+.ot-sec-head .ot-n { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.ot-sec-body { display: none; padding: 12px; }
+.ot-sec.open .ot-sec-body { display: block; }
+.ot-rows { display: grid; gap: 6px; margin: 10px 0; }
+.ot-row { display: grid; grid-template-columns: 130px minmax(0, 1fr) auto; grid-template-areas: "kind text tools" ". val ." ". warn ."; gap: 6px; align-items: start; padding-bottom: 8px; border-bottom: 1px dashed var(--line); }
+.ot-row:last-child { border-bottom: 0; }
+.ot-row > * { min-width: 0; }
+.ot-row > [data-f="kind"] { grid-area: kind; }
+.ot-row > [data-f="text"] { grid-area: text; }
+.ot-row > .ot-tools { grid-area: tools; }
+.ot-row > .ot-val { grid-area: val; }
+.ot-row > .ot-val-empty { display: none; }
+.ot-row :is(input, select) { width: 100%; font-size: 12.5px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 2px; background: #fff; font-family: inherit; }
+.ot-row :is(input, select):focus { border-color: var(--accent); outline: none; }
+.ot-val { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 6px; }
+.ot-val .ot-val-in { display: flex; gap: 6px; min-width: 0; }
+.ot-val .ot-val-in > :first-child { flex: 1; min-width: 0; }
+.ot-val .ot-unit { flex: 0 0 96px; }
+.ot-row .ot-warn { grid-area: warn; font-size: 11px; color: var(--accent); }
+.ot-tools { display: flex; gap: 2px; white-space: nowrap; }
+.ot-kind-h { font-family: var(--mono); font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.ot-pay-row { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 6px; margin-bottom: 6px; }
+.ot-pay-row input { width: 100%; font-size: 12.5px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 2px; }
+@media (max-width: 760px) {
+  .ot-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "kind tools" "text text" "val val" "warn warn"; }
+  .ot-val { grid-template-columns: 1fr; }
+}
+
+/* ── 3D материјали (админ) ── */
+.m3-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 16px; align-items: start; }
+@media (max-width: 1000px) { .m3-grid { grid-template-columns: 1fr; } }
+.m3-lib { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; }
+.m3-tile { display: grid; gap: 6px; padding: 6px; text-align: left; background: #fff; border: 1px solid var(--line); border-radius: 3px; cursor: pointer; font: inherit; }
+.m3-tile:hover { border-color: var(--muted); }
+.m3-tile.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.m3-sw { display: block; height: 64px; border-radius: 2px; background-size: cover; background-position: center; background-blend-mode: multiply; border: 1px solid rgba(0,0,0,.06); }
+.m3-tile b { font-size: 12px; font-weight: 600; line-height: 1.25; }
+.m3-tile small { font-size: 10.5px; color: var(--muted); }
+.m3-edit { display: grid; grid-template-columns: 260px minmax(0, 1fr); gap: 16px; }
+@media (max-width: 640px) { .m3-edit { grid-template-columns: 1fr; } }
+.m3-prev { height: 200px; border-radius: 3px; overflow: hidden; background: var(--panel); display: grid; place-items: center; font-size: 12px; color: var(--muted); }
+.m3-form { display: grid; gap: 12px; align-content: start; }
+.m3-form input[type=color] { width: 100%; height: 36px; padding: 2px; border: 1px solid var(--line); border-radius: 2px; background: #fff; }
+.m3-up { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.m3-sliders { display: grid; gap: 6px; }
+.m3-sliders label { display: grid; grid-template-columns: 96px minmax(0, 1fr) 40px; align-items: center; gap: 8px; font-size: 12px; color: var(--ink-soft); }
+.m3-sliders output { font-family: var(--mono); font-size: 11px; text-align: right; }
+.m3-slots { display: grid; gap: 6px; }
+.m3-slot { display: grid; grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1.2fr); align-items: center; gap: 8px; font-size: 12.5px; }
+.m3-slot .m3-dot { width: 22px; height: 22px; border-radius: 2px; background-size: cover; background-blend-mode: multiply; border: 1px solid rgba(0,0,0,.1); }
+.m3-slot select, .m3-rule :is(select, input) { width: 100%; font-size: 12.5px; padding: 5px 6px; border: 1px solid var(--line); border-radius: 2px; background: #fff; font-family: inherit; }
+.m3-rule { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.1fr) auto; gap: 6px; align-items: center; margin-bottom: 8px; font-size: 12px; }
+@media (max-width: 760px) { .m3-rule { grid-template-columns: 1fr 1fr; } }

@@ -119,6 +119,14 @@ const w1 = run({}).rows.find((r) => r.isWindow);
 const w2 = run({ BOJA_PROZ_NADV: 1.2 }).rows.find((r) => r.isWindow);
 check('  коефициент — боја на прозори ×1.2', w2.price, w1.price * 1.2);
 
+// Параметар „избор" (паѓачко мени) не влегува во пресметката
+{
+  const withSel = Object.assign({}, seed, { inputs: seed.inputs.concat({ key: 'BOJA_FASADA', label: 'Боја', type: 'select', options: ['Бела', 'Сива'], def: '', group: 'КРОВ' }) });
+  const a = engine.compute(withSel, { inputs: Object.assign({}, defaults, { BOJA_FASADA: 'Сива' }), windows: seed.windowsDefaults });
+  check('  избор — не ја менува вкупната цена', a.totalEur, off.totalEur);
+  check('  избор — не е променлива во формулите', 'BOJA_FASADA' in a.resultVars ? 1 : 0, 0);
+}
+
 // Санитариите следат „без галантерија"
 check('  без галантерија — санитарии', qtyOf(run({ WC_SANITARY: 3, BEZ_GALANT: 1 }), 'V03'), 0);
 check('  без галантерија — електрика', qtyOf(run({ ELEKTRIKA: 1, EL_BEZ_GALANT: 1 }), 'E37'), 0);
