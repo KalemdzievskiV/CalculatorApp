@@ -16,6 +16,14 @@
     'https://unpkg.com/three@0.160.0/build/three.module.js',
     'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.min.js',
   ];
+  // Текстури (Poly Haven, CC0) — public/tex; [датотека, вистинска големина во cm]
+  const TEX_BASE = new URL('../tex/', document.currentScript.src).href;
+  const TEX = {
+    plaster: ['painted_plaster_wall', 200], roof: ['corrugated_iron_02', 270], deck: ['wood_floor_deck', 180],
+    laminat: ['plank_flooring_02', 198], tiles: ['large_grey_tiles', 300], concrete: ['concrete_floor_02', 200],
+    pavers: ['concrete_pavers_02', 200], grass: ['leafy_grass', 200],
+  };
+  const SKY = { top: 0x7fa9d6, horizon: 0xdde7ee };
   const COL = {
     wall: 0xf4f1ec, wallIn: 0xe9e4dc, slab: 0xc9c2b6, roof: 0x4b4f55, glass: 0x9cc3da, ground: 0xe8e4dc,
     laminat: 0xc9a47a, plochki: 0xdadfe2, garaza: 0xb9bcc1, deck: 0xb08657, stair: 0xd9cfbf, post: 0x8a8378,
@@ -44,22 +52,99 @@
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = T.PCFSoftShadowMap;
+    // Сенките се пресметуваат само кога моделот се менува (не при секое вртење на камерата)
+    renderer.shadowMap.autoUpdate = false;
+    // AgX: помеки, „фотографски" бои; околината дава рефлектирана светлина на сите површини
+    renderer.toneMapping = T.AgXToneMapping;
+    renderer.toneMappingExposure = 1.2;
     scene = new T.Scene();
-    scene.background = new T.Color(0xf7f4ee);
-    camera = new T.PerspectiveCamera(38, 1, 10, 200000);
-    scene.add(new T.HemisphereLight(0xffffff, 0xb9b1a4, 1.6));
-    sun = new T.DirectionalLight(0xffffff, 1.9);
+    scene.background = new T.Color(SKY.horizon);
+    scene.fog = new T.Fog(SKY.horizon, 1e4, 6e4);
+    const pmrem = new T.PMREMGenerator(renderer);
+    scene.environment = pmrem.fromScene(roomEnvironment(), 0.04).texture;
+    pmrem.dispose();
+    camera = new T.PerspectiveCamera(38, 1, 20, 200000);
+    scene.add(new T.HemisphereLight(0xffffff, 0xa9ae96, 0.6));
+    scene.add(skyDome());
+    sun = new T.DirectionalLight(0xffffff, 2.4);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
     sun.shadow.bias = -0.0004;
     scene.add(sun, sun.target);
-    const ground = new T.Mesh(new T.PlaneGeometry(1e5, 1e5), new T.MeshStandardMaterial({ color: COL.ground, roughness: 1 }));
+    // Трева; малку назад по длабочина за да нема треперење со плочките околу куќата
+    const gg = new T.PlaneGeometry(1e5, 1e5);
+    scaleUV(gg, 1e5, 1e5);
+    const ground = new T.Mesh(gg, tmat('grass', 0x8cc466, { side: T.FrontSide, roughness: 1, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }));
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -21;
     ground.receiveShadow = true;
     scene.add(ground);
     cam.target = new T.Vector3();
     wireControls(renderer.domElement);
+  }
+
+  // Студио-соба со светли панели за околинска светлина (по three.js RoomEnvironment, без addons/import map)
+  function roomEnvironment() {
+    const env = new T.Scene();
+    const geo = new T.BoxGeometry();
+    const room = new T.Mesh(geo, new T.MeshStandardMaterial({ side: T.BackSide }));
+    room.position.set(-0.757, 13.219, 0.717);
+    room.scale.set(31.713, 28.305, 28.591);
+    env.add(room);
+    const panels = [
+      [50, [-16.116, 14.37, 8.208], [0.1, 2.428, 2.739]],
+      [50, [-16.109, 18.021, -8.207], [0.1, 2.425, 2.751]],
+      [17, [14.904, 12.198, -1.832], [0.15, 4.265, 6.331]],
+      [43, [-0.462, 8.89, 14.52], [4.38, 5.441, 0.088]],
+      [20, [3.235, 11.486, -12.541], [2.5, 2, 0.1]],
+      [100, [0, 20, 0], [1, 0.1, 1]],
+    ];
+    for (const [k, p, s] of panels) {
+      const m = new T.Mesh(geo, new T.MeshBasicMaterial());
+      m.material.color.setScalar(k);
+      m.position.set(...p); m.scale.set(...s);
+      env.add(m);
+    }
+    return env;
+  }
+
+  // Небо: голема сфера со преод од хоризонт кон сино горе (не зависи од магла и тонско мапирање)
+  function skyDome() {
+    const g = new T.SphereGeometry(9e4, 32, 16);
+    const top = new T.Color(SKY.top), hor = new T.Color(SKY.horizon), c = new T.Color();
+    const pos = g.attributes.position, cols = [];
+    for (let i = 0; i < pos.count; i++) {
+      const k = Math.pow(Math.max(0, pos.getY(i) / 9e4), 0.6);
+      c.copy(hor).lerp(top, k);
+      cols.push(c.r, c.g, c.b);
+    }
+    g.setAttribute('color', new T.Float32BufferAttribute(cols, 3));
+    const m = new T.Mesh(g, new T.MeshBasicMaterial({ vertexColors: true, side: T.BackSide, fog: false, depthWrite: false, toneMapped: false }));
+    m.renderOrder = -1;
+    return m;
+  }
+
+  // Текстура од public/tex, со повторување; UV-координатите во моделот се во cm
+  const texCache = {};
+  function tex(name, kind, size) {
+    const key = name + '_' + kind;
+    if (!texCache[key]) {
+      const t = new T.TextureLoader().load(TEX_BASE + key + '.webp', requestDraw, undefined, (e) => console.warn('Текстура не се вчита:', key, e));
+      t.wrapS = t.wrapT = T.RepeatWrapping;
+      t.repeat.set(1 / size, 1 / size);
+      if (kind === 'color') t.colorSpace = T.SRGBColorSpace;
+      t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+      texCache[key] = t;
+    }
+    return texCache[key];
+  }
+  function tmat(key, color, extra) {
+    const [name, size] = TEX[key];
+    return mat(color, Object.assign({ map: tex(name, 'color', size), normalMap: tex(name, 'normal', size) }, extra));
+  }
+  function scaleUV(g, su, sv) {
+    const uv = g.attributes.uv;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
   }
 
   function attach(el) {
@@ -95,6 +180,13 @@
     camera.lookAt(target);
     renderer.render(scene, camera);
   }
+  // Повеќе настани во ист фрејм (влечење, тркалце) → едно цртање
+  let drawQueued = false;
+  function requestDraw() {
+    if (drawQueued) return;
+    drawQueued = true;
+    requestAnimationFrame(() => { drawQueued = false; draw(); });
+  }
 
   // Вртење (лев клик), поместување (десен клик / Shift), зум (тркалце)
   function wireControls(el) {
@@ -117,13 +209,13 @@
         cam.theta -= dx * 0.008;
         cam.phi = Math.max(0.08, Math.min(1.53, cam.phi - dy * 0.008));
       }
-      draw();
+      requestDraw();
     });
     el.addEventListener('pointerup', () => { drag = null; });
     el.addEventListener('wheel', (e) => {
       e.preventDefault();
       cam.dist = Math.max(200, Math.min(50000, cam.dist * (e.deltaY < 0 ? 1 / 1.12 : 1.12)));
-      draw();
+      requestDraw();
     }, { passive: false });
   }
 
@@ -157,7 +249,11 @@
   }
 
   function box(x0, x1, y0, y1, z0, z1, material) {
-    const g = new T.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+    const sx = x1 - x0, sy = y1 - y0, sz = z1 - z0;
+    const g = new T.BoxGeometry(sx, sy, sz);
+    // UV во cm по ѕид на кутијата (редослед: +x, −x, +y, −y, +z, −z; по 4 темиња)
+    const uv = g.attributes.uv, dims = [[sz, sy], [sz, sy], [sx, sz], [sx, sz], [sx, sy], [sx, sy]];
+    for (let i = 0; i < uv.count; i++) { const [a, b] = dims[i >> 2]; uv.setXY(i, uv.getX(i) * a, uv.getY(i) * b); }
     g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
     return mesh(g, material);
   }
@@ -225,10 +321,21 @@
       if (r.flat) { slab(part.outline, Htop + 22, 22, roofMat); continue; }
       for (const pc of part.pieces) {
         const faces = T.ShapeUtils.triangulateShape(v2(pc), []);
-        const pos = [];
-        for (const f of faces) for (const k of f) { const [x, y] = pc[k]; pos.push(x, Htop + roofZ(part.planes, x, y) + RT, y); }
+        const pos = [], uvs = [];
+        for (const f of faces) {
+          // Рамнината на овој триаголник; UV: u попречно, v по падот (ребрата на лимот одат надолу)
+          const cx = (pc[f[0]][0] + pc[f[1]][0] + pc[f[2]][0]) / 3, cy = (pc[f[0]][1] + pc[f[1]][1] + pc[f[2]][1]) / 3;
+          const p = part.planes.reduce((m, q) => (q.a * cx + q.b * cy + q.c < m.a * cx + m.b * cy + m.c ? q : m));
+          const gl = Math.hypot(p.a, p.b), dx = gl > 1e-6 ? p.a / gl : 1, dy = gl > 1e-6 ? p.b / gl : 0, st = Math.sqrt(1 + gl * gl);
+          for (const k of f) {
+            const [x, y] = pc[k];
+            pos.push(x, Htop + roofZ(part.planes, x, y) + RT, y);
+            uvs.push(-dy * x + dx * y, (dx * x + dy * y) * st);
+          }
+        }
         const g = new T.BufferGeometry();
         g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
+        g.setAttribute('uv', new T.Float32BufferAttribute(uvs, 2));
         g.computeVertexNormals();
         mesh(g, roofMat);
       }
@@ -242,7 +349,7 @@
       const g = new T.BufferGeometry();
       g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
       g.computeVertexNormals();
-      mesh(g, roofMat);
+      mesh(g, fasciaMat);
     }
   }
 
@@ -266,13 +373,18 @@
     box(t.x - 10, t.x + t.w + 10, y1, y1 + 16, t.y - 10, t.y + t.h + 10, roofMat);
   }
 
-  let wallMat, wallInMat, slabMat, roofMat, glassMat, deckMat, stairMat, postMat, floorMats;
+  let wallMat, wallInMat, slabMat, roofMat, fasciaMat, glassMat, deckMat, stairMat, postMat, floorMats, paverMat;
   function materials() {
-    wallMat = mat(COL.wall); wallInMat = mat(COL.wallIn); slabMat = mat(COL.slab);
-    roofMat = mat(COL.roof, { roughness: 0.55, metalness: 0.25 });
-    glassMat = mat(COL.glass, { transparent: true, opacity: 0.45, roughness: 0.1 });
-    deckMat = mat(COL.deck); stairMat = mat(COL.stair); postMat = mat(COL.post);
-    floorMats = { laminat: mat(COL.laminat), plochki: mat(COL.plochki), garaza: mat(COL.garaza) };
+    // Бојата се множи со текстурата; >1 ја посветлува (малтерот во текстурата е сив)
+    wallMat = tmat('plaster', new T.Color().setScalar(1.5), { normalScale: new T.Vector2(0.5, 0.5) });
+    wallInMat = tmat('plaster', new T.Color(0xf2ece2).multiplyScalar(1.2), { normalScale: new T.Vector2(0.4, 0.4) });
+    slabMat = tmat('concrete', 0xd6d2ca);
+    roofMat = tmat('roof', 0xffffff, { roughness: 0.5, metalness: 0.35 });
+    fasciaMat = mat(0x3c4046, { roughness: 0.5, metalness: 0.35 });
+    glassMat = mat(COL.glass, { transparent: true, opacity: 0.35, roughness: 0.05 });
+    deckMat = tmat('deck', 0xd2bca4); stairMat = tmat('laminat', 0xe2d2bc); postMat = mat(COL.post);
+    floorMats = { laminat: tmat('laminat', 0xd4c8b8), plochki: tmat('tiles', new T.Color().setScalar(1.15)), garaza: tmat('concrete', 0xffffff) };
+    paverMat = tmat('pavers', new T.Color(0xece6dc).multiplyScalar(1.2), { roughness: 0.95 });
   }
 
   function build() {
@@ -317,11 +429,24 @@
     say(empty ? 'Нема што да се прикаже — нацртај надворешни ѕидови во 2D планот.' : '');
     if (empty) { bb.set(new T.Vector3(0, 0, 0), new T.Vector3(1000, 300, 1000)); needFit = true; }
     const c = bb.getCenter(new T.Vector3()), size = bb.getSize(new T.Vector3()), R = Math.max(size.x, size.y, size.z, 500);
-    sun.position.set(c.x - R * 0.9, c.y + R * 1.6, c.z + R * 1.2);
+    // Плочки околу куќата (по bb, пред да се додадат — не влијаат на центрирањето)
+    if (!empty) {
+      const m = 120, x0 = bb.min.x - m, x1 = bb.max.x + m, z0 = bb.min.z - m, z1 = bb.max.z + m;
+      const pg = new T.ShapeGeometry(new T.Shape(v2([[x0, z0], [x1, z0], [x1, z1], [x0, z1]])));
+      pg.rotateX(Math.PI / 2);
+      pg.translate(0, -18, 0);
+      mesh(pg, paverMat, false);
+    }
+    // Тревата се топи во хоризонтот подалеку од куќата
+    scene.fog.near = Math.max(R * 6, 6000);
+    scene.fog.far = scene.fog.near * 5;
+    // Сонце од предна десна страна во однос на почетната камера — видливите ѕидови се осветлени
+    sun.position.set(c.x + R * 1.3, c.y + R * 1.6, c.z + R * 0.5);
     sun.target.position.copy(c);
     const sc = sun.shadow.camera;
     sc.left = -R * 1.5; sc.right = R * 1.5; sc.top = R * 1.5; sc.bottom = -R * 1.5; sc.near = 10; sc.far = R * 6;
     sc.updateProjectionMatrix();
+    renderer.shadowMap.needsUpdate = true;
     if (needFit && !empty) {
       cam.target.copy(c);
       cam.dist = R * 2.1;
