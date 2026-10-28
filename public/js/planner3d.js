@@ -249,18 +249,21 @@
   }
 
   function box(x0, x1, y0, y1, z0, z1, material) {
+    return mesh(boxGeo(x0, x1, y0, y1, z0, z1), material);
+  }
+  function boxGeo(x0, x1, y0, y1, z0, z1) {
     const sx = x1 - x0, sy = y1 - y0, sz = z1 - z0;
     const g = new T.BoxGeometry(sx, sy, sz);
     // UV во cm по ѕид на кутијата (редослед: +x, −x, +y, −y, +z, −z; по 4 темиња)
     const uv = g.attributes.uv, dims = [[sz, sy], [sz, sy], [sx, sz], [sx, sz], [sx, sy], [sx, sy]];
     for (let i = 0; i < uv.count; i++) { const [a, b] = dims[i >> 2]; uv.setXY(i, uv.getX(i) * a, uv.getY(i) * b); }
     g.translate((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
-    return mesh(g, material);
+    return g;
   }
 
   // Ѕид: профил во рамнина на ѕидот (u по должина, v нагоре), исечени врати и прозори,
   // горниот раб следи функција (кај највисокиот кат — кровот, за затворање на забатите)
-  function wall(w, base, H, topAt, material) {
+  function wall(w, base, H, topAt, material, opts = {}) {
     const L = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
     if (L < 1) return;
     const ux = (w.x2 - w.x1) / L, uy = (w.y2 - w.y1) / L, nx = -uy, ny = ux, Tk = w.T;
@@ -284,12 +287,52 @@
     m4.setPosition(w.x1 - nx * Tk / 2, base, w.y1 - ny * Tk / 2);
     g.applyMatrix4(m4);
     mesh(g, material);
-    // Стакло во прозорите
-    for (const o of ops) if (o.glass) {
-      const gl = new T.BoxGeometry(o.w, o.top - o.bottom, 2);
-      gl.rotateY(Math.atan2(-uy, ux));
-      gl.translate(w.x1 + ux * o.t, base + (o.bottom + o.top) / 2, w.y1 + uy * o.t);
-      mesh(gl, glassMat, false);
+
+    // Детали во рамнина на ѕидот: u по должина, v нагоре од base, n од средината на ѕидот
+    const L4 = new T.Matrix4().makeBasis(new T.Vector3(ux, 0, uy), new T.Vector3(0, 1, 0), new T.Vector3(nx, 0, ny));
+    L4.setPosition(w.x1, base, w.y1);
+    const lb = (u0, u1, v0, v1, n0, n1, m, shadow = true) => mesh(boxGeo(u0, u1, v0, v1, n0, n1).applyMatrix4(L4), m, shadow);
+    // Надворешна страна: +1 ако n гледа нанадвор, −1 ако навнатре, 0 кај внатрешни ѕидови
+    let s = 0;
+    if (w.kind === 'out') {
+      const px = (w.x1 + w.x2) / 2 + nx * Tk, py = (w.y1 + w.y2) / 2 + ny * Tk;
+      s = (opts.loops || []).some((lp) => inPoly(lp, px, py)) ? -1 : 1;
+    }
+
+    const P = 7, D = Math.min(8, Tk - 2);  // профил на рамка (cm) и длабочина
+    for (const o of ops) {
+      const a = o.t - o.w / 2, b = o.t + o.w / 2, door = !o.glass;
+      const fm = door && !s ? doorFrameInMat : frameMat;
+      lb(a, a + P, o.bottom, o.top, -D / 2, D / 2, fm);
+      lb(b - P, b, o.bottom, o.top, -D / 2, D / 2, fm);
+      lb(a + P, b - P, o.top - P, o.top, -D / 2, D / 2, fm);
+      if (!door) {
+        lb(a + P, b - P, o.bottom, o.bottom + P, -D / 2, D / 2, fm);
+        lb(a + P, b - P, o.bottom + P, o.top - P, -1, 1, glassMat, false);
+        if (o.w > 130) lb(o.t - 3, o.t + 3, o.bottom + P, o.top - P, -D / 2 + 1, D / 2 - 1, fm);  // средна вертикала
+        // Надворешна алуминиумска клупчица
+        if (o.bottom > 0 && s) {
+          const n0 = s * (Tk / 2 - 10), n1 = s * (Tk / 2 + 5);
+          lb(a - 4, b + 4, o.bottom - 4, o.bottom, Math.min(n0, n1), Math.max(n0, n1), sillMat);
+        }
+      } else {
+        lb(a + P, b - P, 0, o.top - P, -2, 2, s ? doorOutMat : doorInMat);
+        const hu = b - P - 12;
+        lb(hu - 7, hu + 7, 100, 104, -7, 7, handleMat);
+      }
+    }
+
+    // Темна сокла по дното на надворешните ѕидови на приземјето (прекината кај вратите)
+    if (opts.ground && s) {
+      const n0 = s > 0 ? Tk / 2 - 0.5 : -Tk / 2 - 1.5, n1 = s > 0 ? Tk / 2 + 1.5 : -Tk / 2 + 0.5, PH = 30;
+      let u = -e - 1.5;
+      for (const o of ops) if (o.bottom <= 0) {
+        const a = o.t - o.w / 2, b = o.t + o.w / 2;
+        if (a > u) lb(u, a, -20, PH, n0, n1, plinthMat);
+        lb(a, b, -20, 0, n0, n1, plinthMat);
+        u = b;
+      }
+      lb(u, L + e + 1.5, -20, PH, n0, n1, plinthMat);
     }
   }
 
@@ -350,6 +393,28 @@
       g.setAttribute('position', new T.Float32BufferAttribute(pos, 3));
       g.computeVertexNormals();
       mesh(g, fasciaMat);
+      gutters(part, Htop);
+    }
+  }
+
+  // Олук по секој долен (хоризонтален) раб на кровот: кровот од тој раб се крева навнатре
+  function gutters(part, Htop) {
+    const O = part.outline, R = 7;
+    for (let i = 0; i < O.length; i++) {
+      const [ax, ay] = O[i], [bx, by] = O[(i + 1) % O.length];
+      const len = Math.hypot(bx - ax, by - ay);
+      if (len < 30) continue;
+      const za = roofZ(part.planes, ax, ay), zb = roofZ(part.planes, bx, by);
+      if (Math.abs(za - zb) > 0.5) continue;
+      const dx = (bx - ax) / len, dy = (by - ay) / len, mx = (ax + bx) / 2, my = (ay + by) / 2;
+      let nx = -dy, ny = dx;  // нормала навнатре
+      if (!inPoly(O, mx + nx * 20, my + ny * 20)) { nx = -nx; ny = -ny; }
+      if (roofZ(part.planes, mx + nx * 20, my + ny * 20) < za + 1) continue;
+      const g = new T.CylinderGeometry(R, R, len, 12);
+      g.rotateZ(Math.PI / 2);
+      g.rotateY(Math.atan2(-dy, dx));
+      g.translate(mx - nx * (R + 1), Htop + za - 2, my - ny * (R + 1));
+      mesh(g, gutterMat);
     }
   }
 
@@ -374,6 +439,7 @@
   }
 
   let wallMat, wallInMat, slabMat, roofMat, fasciaMat, glassMat, deckMat, stairMat, postMat, floorMats, paverMat;
+  let frameMat, doorFrameInMat, doorOutMat, doorInMat, handleMat, sillMat, plinthMat, gutterMat;
   function materials() {
     // Бојата се множи со текстурата; >1 ја посветлува (малтерот во текстурата е сив)
     wallMat = tmat('plaster', new T.Color().setScalar(1.5), { normalScale: new T.Vector2(0.5, 0.5) });
@@ -385,6 +451,15 @@
     deckMat = tmat('deck', 0xd2bca4); stairMat = tmat('laminat', 0xe2d2bc); postMat = mat(COL.post);
     floorMats = { laminat: tmat('laminat', 0xd4c8b8), plochki: tmat('tiles', new T.Color().setScalar(1.15)), garaza: tmat('concrete', 0xffffff) };
     paverMat = tmat('pavers', new T.Color(0xece6dc).multiplyScalar(1.2), { roughness: 0.95 });
+    // ПВЦ дограма антрацит, внатрешни врати бели, блиндирана влезна врата темна
+    frameMat = mat(0x3a3e44, { roughness: 0.6 });
+    doorFrameInMat = mat(0xeeebe5, { roughness: 0.7 });
+    doorOutMat = mat(0x34383e, { roughness: 0.45, metalness: 0.2 });
+    doorInMat = mat(0xf2efe9, { roughness: 0.6 });
+    handleMat = mat(0xc9ccd0, { roughness: 0.3, metalness: 0.8 });
+    sillMat = mat(0xb4b8bc, { roughness: 0.4, metalness: 0.5 });
+    plinthMat = tmat('plaster', 0x5f6369, { normalScale: new T.Vector2(0.6, 0.6) });
+    gutterMat = mat(0x4e5258, { roughness: 0.45, metalness: 0.4 });
   }
 
   function build() {
@@ -412,7 +487,7 @@
         mesh(g, floorMats[rm.floor] || floorMats.laminat, false);
       }
       const isTop = r && i === r.top && show.roof;
-      for (const w of f.walls) wall(w, f.base, f.h, isTop && w.kind === 'out' ? roofTop(r.parts, f.h) : null, w.kind === 'out' ? wallMat : wallInMat);
+      for (const w of f.walls) wall(w, f.base, f.h, isTop && w.kind === 'out' ? roofTop(r.parts, f.h) : null, w.kind === 'out' ? wallMat : wallInMat, { loops: f.loops, ground: i === 0 });
       for (const x of f.stairs) stairs(x, f.base, f.h);
       for (const t of f.terraces) terrace(t, f.base, f.h);
     });
