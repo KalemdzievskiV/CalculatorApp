@@ -81,9 +81,9 @@ const inputs = [
 
   { key: 'ROOF_LIM',      label: 'Кров лим', type: 'boolean', def: 1, group: 'КРОВ', exclusive: 'КРОВ' },
   { key: 'ROOF_PUR',      label: 'Кров ПУР панел', type: 'boolean', def: 0, group: 'КРОВ', exclusive: 'КРОВ' },
-  { key: 'FALCOVAN_LIM',  label: 'Фалцован лим', type: 'boolean', def: 0, group: 'КРОВ' },
+  { key: 'FALCOVAN_LIM',  label: 'Фалцован лим', type: 'boolean', def: 0, group: 'КРОВ', gate: 'ROOF_LIM', reveal: true },
   { key: 'BOJA_LIM',      label: 'Боја на лим', type: 'number', def: 1, group: 'КРОВ', role: 'factor' },
-  { key: 'OLUCI_KRUZNI',  label: 'Олуци кружни', type: 'boolean', def: 0, group: 'КРОВ', exclusive: 'ОЛУЦИ' },
+  { key: 'OLUCI_KRUZNI',  label: 'Олуци кружни', type: 'boolean', def: 1, group: 'КРОВ', exclusive: 'ОЛУЦИ' },
   { key: 'OLUCI_PRAVO',   label: 'Олуци правоаголни', type: 'boolean', def: 0, group: 'КРОВ', exclusive: 'ОЛУЦИ' },
 
   { key: 'DOORS_IN',      label: 'Внатрешни врати', unit: 'ком', type: 'number', def: 8, group: 'ВРАТИ' },
@@ -342,13 +342,17 @@ const materials = [
   // ─── КРОВОПОКРИВАЊЕ ───
   m('R01', 'POKRIVANJE', 'ПУР ПАНЕЛ ЛИМ 10СМ', 'м2', 1000, '(ROOF+25)*ROOF_PUR'),
   m('R02', 'POKRIVANJE', 'РАБОТНА ПУР ПАНЕЛ', 'м2', 750, 'qty("R01")'),
-  m('R03', 'POKRIVANJE', 'ЛИМ ПОКРИВЕН', 'м2', 1450, 'ROOF*ROOF_LIM', { grey: 1, priceFormula: 'PRICE * BOJA_LIM' }),
+  m('R03', 'POKRIVANJE', 'ЛИМ ПОКРИВЕН', 'м2', 1450, 'ROOF*ROOF_LIM*(1-FALCOVAN_LIM)', { grey: 1, priceFormula: 'PRICE * BOJA_LIM' }),
   m('R04', 'POKRIVANJE', 'ЛИМ ЅИДЕН', 'м2', 1225, 0, { priceFormula: 'PRICE * BOJA_LIM' }),
   m('R05', 'POKRIVANJE', 'ВЕТЕРЛАЈСНИ', 'м1', 980, '((WALL_OUT+10)+(AREA/10))*ROOF_LIM', { grey: 1 }),
-  m('R06', 'POKRIVANJE', 'ВЕРТИКАЛНИ ОЛУЦИ', 'м1', 980, '(HEIGHT*9)*ROOF_LIM', { grey: 1 }),
-  m('R07', 'POKRIVANJE', 'ХОРИЗОНТАЛНИ ОЛУЦИ', 'м1', 980, '(WALL_OUT/2.3)*ROOF_LIM', { grey: 1 }),
+  m('R06', 'POKRIVANJE', 'ВЕРТИКАЛНИ ОЛУЦИ', 'м1', 980, '(HEIGHT*9)*ROOF_LIM*OLUCI_KRUZNI', { grey: 1 }),
+  m('R07', 'POKRIVANJE', 'ХОРИЗОНТАЛНИ ОЛУЦИ', 'м1', 980, '(WALL_OUT/2.3)*ROOF_LIM*OLUCI_KRUZNI', { grey: 1 }),
   m('R08', 'POKRIVANJE', 'СЛЕМЕ', 'м1', 950, '(AREA/19)*ROOF_LIM', { grey: 1 }),
   m('R09', 'POKRIVANJE', 'СИМС ОКОЛУ ОБЈЕКТ', 'м2', 3200, 'SIMS', { grey: 1 }),
+  // Варијанти што ги вклучуваат прекинувачите „Фалцован лим“ и „Олуци правоаголни“
+  m('R10', 'POKRIVANJE', 'ФАЛЦОВАН ЛИМ ПОКРИВЕН', 'м2', 1450, 'ROOF*ROOF_LIM*FALCOVAN_LIM', { grey: 1, priceFormula: 'PRICE * BOJA_LIM' }),
+  m('R11', 'POKRIVANJE', 'ВЕРТИКАЛНИ ОЛУЦИ ПРАВОАГОЛНИ', 'м1', 980, '(HEIGHT*9)*ROOF_LIM*OLUCI_PRAVO', { grey: 1 }),
+  m('R12', 'POKRIVANJE', 'ХОРИЗОНТАЛНИ ОЛУЦИ ПРАВОАГОЛНИ', 'м1', 980, '(WALL_OUT/2.3)*ROOF_LIM*OLUCI_PRAVO', { grey: 1 }),
 
   // ─── ИЗРАБОТКА И МОНТАЖА ───
   m('L01', 'RABOTNA', 'РАБОТНА КОНСТРУКЦИЈА', 'пауш', 1500, 'AREA*MONTAZA', { grey: 0.5 }),

@@ -32,7 +32,7 @@ node server.js
 - влезни параметри: `AREA`, `AREA_HOUSE`, `WALL_OUT`, `WALL_IN`, `FLOOR_H`, `ROOF`, `WC`, `KAMENA`, `SIP`, `ELEKTRIKA`… (да/не параметрите се 0/1)
 - количини од други ставки: `qty("K01")`
 - износи во МКД од други ставки: `total("EM01")`
-- оператори `+ - * / ( )` и функции `min max round ceil floor abs`
+- оператори `+ - * / ( )` и функции `min max round ceil floor abs` и `if(услов, а, б)`
 
 Пример (стиропор за фасада): `((FLOOR_H*WALL_OUT)+5)*ABRIB`
 

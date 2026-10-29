@@ -2,7 +2,7 @@
  * MDA пресметковен мотор.
  * Безбеден парсер/евалуатор за формули: броеви, + - * / ( ), унарен минус,
  * променливи (влезни параметри), qty("КОД") и total("КОД") за други ставки,
- * и функции min/max/round/ceil/floor/abs.
+ * и функции min/max/round/ceil/floor/abs/if.
  * Работи и во Node (module.exports) и во прелистувач (window.MDAEngine).
  */
 (function (root, factory) {
@@ -119,6 +119,8 @@
     min: (a) => Math.min(...a), max: (a) => Math.max(...a),
     round: (a) => Math.round(a[0]), ceil: (a) => Math.ceil(a[0]),
     floor: (a) => Math.floor(a[0]), abs: (a) => Math.abs(a[0]),
+    // if(услов, а, б): а ако условот не е 0, инаку б — пр. if(LAMINAT_M2, LAMINAT_M2, проценка)
+    if: (a) => (a[0] ? a[1] : a[2]),
   };
 
   function evalAst(node, ctx) {

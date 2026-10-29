@@ -11,7 +11,7 @@
  *  · Секоја промена се пријавува во конзола за да се види што се случило при подигање.
  */
 
-const SCHEMA_VERSION = 5;
+const SCHEMA_VERSION = 6;
 
 // [код, стара фиксна количина, нова формула]
 const REWIRE_QTY = [
@@ -208,6 +208,59 @@ const MIGRATIONS = [
       cur.group = 'WC';
       log(key + ' → WC');
     }
+  },
+
+  /* 5 → 6: прекинувачи што не правеа ништо (скеле, фалцован лим, олуци, ламинат/плочки м²). */
+  function deadSwitches(db, seed, log) {
+    const mat = (code) => db.materials.find((m) => m.code === code);
+    const hasInput = (key) => db.inputs.some((i) => i.key === key);
+    const uses = (f, key) => new RegExp('\\b' + key + '\\b').test(String(f || ''));
+    // Формулата се множи со прекинувачот (ако веќе не го користи) — рачните измени остануваат внатре
+    const wrap = (code, build, key) => {
+      const m = mat(code);
+      if (!m || !hasInput(key)) return;
+      if (uses(m.formula, key)) { log('ПРЕСКОКНАТО ' + code + ' — веќе користи ' + key); return; }
+      if (!m.formula) { log('ПРЕСКОКНАТО ' + code + ' — нема формула, провери го сам'); return; }
+      m.formula = build(m.formula);
+      log(code + ' → ' + m.formula);
+    };
+    const times = (key) => (f) => '(' + f + ')*' + key;
+
+    // Скеле: се наплаќаше секогаш, без разлика на „Скеле за работа“
+    wrap('L10', times('SKELE'), 'SKELE');
+
+    // Фалцован лим: обичниот лим се заменува со фалцован (нова ставка, иста почетна цена)
+    // Олуци: кружните остануваат, правоаголните се нови ставки (иста почетна цена)
+    const variants = [
+      ['R03', 'R10', 'ФАЛЦОВАН ЛИМ ПОКРИВЕН', 'FALCOVAN_LIM', (f) => '(' + f + ')*(1-FALCOVAN_LIM)'],
+      ['R06', 'R11', 'ВЕРТИКАЛНИ ОЛУЦИ ПРАВОАГОЛНИ', 'OLUCI_PRAVO', times('OLUCI_KRUZNI'), 'OLUCI_KRUZNI'],
+      ['R07', 'R12', 'ХОРИЗОНТАЛНИ ОЛУЦИ ПРАВОАГОЛНИ', 'OLUCI_PRAVO', times('OLUCI_KRUZNI'), 'OLUCI_KRUZNI'],
+    ];
+    for (const [base, code, name, key, rewire, baseKey] of variants) {
+      const b = mat(base);
+      if (!b || !hasInput(key) || !b.formula) continue;
+      if (!mat(code)) {
+        const nm = Object.assign({}, b, { code, name, formula: '(' + b.formula + ')*' + key });
+        const at = db.materials.reduce((last, m, i) => (m.cat === b.cat ? i : last), -1);
+        db.materials.splice(at + 1, 0, nm);
+        log('нова ставка ' + code + ' ' + name + ' → ' + nm.formula + ' (цена ' + nm.price + ', провери ја)');
+      }
+      wrap(base, rewire, baseKey || key);
+    }
+    const fal = db.inputs.find((i) => i.key === 'FALCOVAN_LIM');
+    if (fal && !fal.gate && hasInput('ROOF_LIM')) { fal.gate = 'ROOF_LIM'; fal.reveal = true; log('FALCOVAN_LIM → gate=ROOF_LIM'); }
+
+    // Ламинат / плочки м²: внесената површина ја заменува проценката од квадратурата
+    wrap('PD19', (f) => 'if(LAMINAT_M2, LAMINAT_M2, ' + f + ')', 'LAMINAT_M2');
+    wrap('PD17', (f) => 'if(PLOCKI_M2, PLOCKI_M2, ' + f + ')', 'PLOCKI_M2');
+    for (const [key, label] of [['LAMINAT_M2', 'Ламинат м² (точно, наместо проценка)'], ['PLOCKI_M2', 'Плочки м² (точно, наместо проценка)']]) {
+      const i = db.inputs.find((x) => x.key === key);
+      if (i && /^(Ламинат|Плочки) м2$/.test(i.label)) { i.label = label; i.unit = i.unit || 'm²'; log(key + ' → „' + label + '“'); }
+    }
+
+    // „Test“ е паѓачкото мени за боја на ПВЦ столарија во шаблонот за понуда
+    const t = db.inputs.find((i) => i.key === 'TEST');
+    if (t && t.label === 'Test') { t.label = 'Боја на ПВЦ столарија'; log('TEST → „Боја на ПВЦ столарија“'); }
   },
 ];
 
