@@ -757,3 +757,17 @@ body.notice-closed .nav-hero { top: 0; }
 .pl-idim { fill: #2f6f9f; font-size: 10.5px; }
 .pl-idim-ln { stroke: #2f6f9f; stroke-width: 1; stroke-opacity: .45; stroke-dasharray: 2 3; pointer-events: none; }
 .pl-snap { fill: rgba(219,75,59,.18); stroke: var(--accent); stroke-width: 2; pointer-events: none; }
+
+/* 3D: натписи на просториите и поглед одвнатре */
+.p3-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.p3-label { position: absolute; left: 0; top: 0; padding: 4px 10px; background: rgba(255,255,255,.94); border-radius: 999px; box-shadow: 0 1px 4px rgba(0,0,0,.18); font-family: var(--sans); font-size: 12px; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.p3-opts { flex-wrap: wrap; }
+.p3-opts .pl-seg .seg-btn { padding: 5px 11px; }
+/* План: нови алатки (правоаголник, избор на област, уредување мерка) */
+.pl-t-rect i { border: 2.5px solid #3b3732; height: 12px; }
+.pl-t-box i { border: 1.5px dashed currentColor; height: 12px; }
+.pl-dim.ed { pointer-events: auto; cursor: pointer; }
+.pl-dim.ed:hover { fill: var(--accent); text-decoration: underline; }
+.pl-dimedit { position: absolute; transform: translate(-50%, -50%); width: 78px; padding: 3px 6px; font-family: var(--mono); font-size: 13px; text-align: center; border: 2px solid var(--accent); border-radius: 2px; background: #fff; z-index: 5; }
+.pl-boxsel { fill: rgba(219,75,59,.06); stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 5 4; pointer-events: none; }
+.pl-multibox { fill: none; stroke: var(--accent); stroke-width: 1.2; stroke-dasharray: 3 4; pointer-events: none; }

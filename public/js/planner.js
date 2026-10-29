@@ -39,9 +39,11 @@
   const RECTS = { terrace: 'terraces', stair: 'stairs' };  // правоаголни објекти (влечење, поместување, големина)
   const TOOLS = [
     ['select', 'Избери'],
+    ['box', 'Избери област'],
     ['Конструкција'],
     ['out', 'Надворешен ѕид'],
     ['in', 'Внатрешен ѕид'],
+    ['rect', 'Правоаголник'],
     ['door', 'Врата'],
     ['win', 'Прозор'],
     ['stair', 'Скали'],
@@ -51,7 +53,10 @@
     ['terrace', 'Тераса'],
   ];
   const HINTS = {
-    select: 'Клик на елемент за избор. Влечи ѕид, агол (точка), врата, прозор или тераса за да ги поместиш. Delete брише, Ctrl+Z враќа. Влечи празен простор за поместување на погледот, тркалце за зум.',
+    select: 'Клик на елемент за избор. Влечи ѕид, агол (точка), врата, прозор или тераса за да ги поместиш. Клик на мерка на ѕид ја менува должината. Delete брише, Ctrl+Z враќа, Ctrl+C / Ctrl+V копира. Влечи празен простор за поместување на погледот, тркалце за зум.',
+    box: 'Влечи правоаголник околу делот од планот што го сакаш. Потоа: влечи го за да го поместиш, копирај (Ctrl+C) и залепи (Ctrl+V), пресликај или сврти го десно.',
+    rect: 'Влечи правоаголник = 4 ѕида. Внатре во куќата прави внатрешни ѕидови (просторија), надвор прави надворешни (нова куќа или доградба до постоечката). Ѕидовите што веќе постојат не се дуплираат.',
+    paste: 'Помести го курсорот и кликни каде да се залепи. Esc откажува.',
     out: 'Клик за почеток, клик за секој агол. Внеси должина во cm и Enter за точна мерка. Клик на почетната точка ја затвора куќата. Двоен клик или Esc — крај. Shift — слободен агол.',
     in: 'Клик за почеток, клик за секој агол — точките се лепат на постоечките ѕидови. Внеси должина во cm и Enter. Двоен клик или Esc — крај.',
     door: 'Клик на ѕид за да поставиш врата. На внатрешен ѕид = внатрешна врата, на надворешен = влезна (блиндор).',
@@ -523,7 +528,7 @@
     if (!st.hist.length) return;
     st.plan = JSON.parse(st.hist.pop());
     if (!isSlab() && st.floor >= st.plan.floors.length) st.floor = 0;
-    st.sel = null; st.draw = null;
+    st.sel = null; st.draw = null; st.multi = null; st.paste = null;
     renderFloors();
     refresh();
   }
@@ -587,6 +592,244 @@
       d.t = Math.max(d.w / 2, Math.min(L - d.w / 2, d.t));
     }
   }
+
+  // ── Правоаголник од 4 ѕида ──
+  // Дел од ѕид што лежи на постоечки ѕид не се додава. Надворешен правоаголник залепен до
+  // куќата е доградба: заедничкиот дел од стариот надворешен ѕид станува внатрешен.
+  function splitAny(f, p) {
+    for (const w of f.walls) {
+      if (same(w.x1, w.y1, p.x, p.y) || same(w.x2, w.y2, p.x, p.y)) continue;
+      const pr = project(w, p.x, p.y);
+      if (Math.hypot(pr.x - p.x, pr.y - p.y) > 1 || pr.t < 1 || pr.t > wlen(w) - 1) continue;
+      const nw = { id: uid(), kind: w.kind, x1: p.x, y1: p.y, x2: w.x2, y2: w.y2 };
+      for (const d of [...f.doors, ...f.windows]) if (d.wall === w.id && d.t > pr.t) { d.wall = nw.id; d.t -= pr.t; }
+      w.x2 = p.x; w.y2 = p.y;
+      f.walls.push(nw);
+      return;
+    }
+  }
+  function addEdge(kind, A, B) {
+    const f = F(), L = Math.hypot(B.x - A.x, B.y - A.y), ux = (B.x - A.x) / L, uy = (B.y - A.y) / L;
+    const P = (t) => ({ x: Math.round(A.x + ux * t), y: Math.round(A.y + uy * t) });
+    const along = (x, y) => (x - A.x) * ux + (y - A.y) * uy, off = (x, y) => Math.abs((x - A.x) * uy - (y - A.y) * ux);
+    const iv = [];
+    for (const w of f.walls) {
+      if (off(w.x1, w.y1) > 1 || off(w.x2, w.y2) > 1) continue;
+      const t1 = along(w.x1, w.y1), t2 = along(w.x2, w.y2), s = Math.max(0, Math.min(t1, t2)), e = Math.min(L, Math.max(t1, t2));
+      if (e - s > 1) iv.push([s, e, w]);
+    }
+    if (kind === 'out' && !isSlab()) {
+      for (const [s, e, w] of iv) if (w.kind === 'out') { splitAny(f, P(s)); splitAny(f, P(e)); }
+      for (const w of f.walls) {
+        if (w.kind !== 'out' || off(w.x1, w.y1) > 1 || off(w.x2, w.y2) > 1) continue;
+        const a = along(w.x1, w.y1), b = along(w.x2, w.y2);
+        if (Math.min(a, b) >= -0.5 && Math.max(a, b) <= L + 0.5) w.kind = 'in';
+      }
+    }
+    iv.sort((p, q) => p[0] - q[0]);
+    let cur = 0;
+    for (const [s, e] of iv) { if (s - cur >= 5) addWall(kind, P(cur), P(s)); cur = Math.max(cur, e); }
+    if (L - cur >= 5) addWall(kind, P(cur), P(L));
+  }
+  function addRect(a, b) {
+    const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+    if (x1 - x0 < 20 || y1 - y0 < 20) return;
+    const f = F();
+    const kind = isSlab() ? 'out' : (outerLoops(f) || []).some((lp) => inPoly(lp, (x0 + x1) / 2, (y0 + y1) / 2)) ? 'in' : 'out';
+    snapshot();
+    const C = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+    for (let i = 0; i < 4; i++) {
+      const [ax, ay] = C[i], [bx, by] = C[(i + 1) % 4];
+      addEdge(kind, { x: ax, y: ay }, { x: bx, y: by });
+    }
+    refresh();
+  }
+
+  // ── Избор на повеќе елементи: поместување, копирање, пресликување, вртење ──
+  const MT = { wall: 'walls', door: 'doors', win: 'windows', room: 'rooms', terrace: 'terraces', stair: 'stairs' };
+  const MKEYS = Object.values(MT);
+  const emptyMulti = () => Object.fromEntries(MKEYS.map((k) => [k, []]));
+  const multiCount = (m) => (m ? MKEYS.reduce((s, k) => s + m[k].length, 0) : 0);
+  const inMulti = (type, id) => !!(st.multi && MT[type] && st.multi[MT[type]].includes(id));
+  // Елементите во правоаголникот r (cm): ѕидови со двата краја внатре, нивните отвори, простории (точката), тераси/скали цели
+  function collect(f, r) {
+    const inR = (x, y) => x >= r.x0 - 0.5 && x <= r.x1 + 0.5 && y >= r.y0 - 0.5 && y <= r.y1 + 0.5;
+    const m = emptyMulti();
+    m.walls = f.walls.filter((w) => inR(w.x1, w.y1) && inR(w.x2, w.y2)).map((w) => w.id);
+    m.doors = f.doors.filter((d) => m.walls.includes(d.wall)).map((d) => d.id);
+    m.windows = f.windows.filter((d) => m.walls.includes(d.wall)).map((d) => d.id);
+    m.rooms = f.rooms.filter((x) => inR(x.x, x.y)).map((x) => x.id);
+    m.terraces = f.terraces.filter((z) => inR(z.x, z.y) && inR(z.x + z.w, z.y + z.h)).map((z) => z.id);
+    m.stairs = f.stairs.filter((z) => inR(z.x, z.y) && inR(z.x + z.w, z.y + z.h)).map((z) => z.id);
+    return multiCount(m) ? m : null;
+  }
+  // Еден избран елемент → множество (за копирање)
+  function selAsMulti() {
+    if (st.multi) return st.multi;
+    if (!st.sel || !MT[st.sel.type]) return null;
+    const m = emptyMulti(), f = F();
+    m[MT[st.sel.type]].push(st.sel.id);
+    if (st.sel.type === 'wall') { m.doors = f.doors.filter((d) => d.wall === st.sel.id).map((d) => d.id); m.windows = f.windows.filter((d) => d.wall === st.sel.id).map((d) => d.id); }
+    return m;
+  }
+  const pick = (f, m) => ({
+    walls: f.walls.filter((x) => m.walls.includes(x.id)), doors: f.doors.filter((x) => m.doors.includes(x.id)),
+    windows: f.windows.filter((x) => m.windows.includes(x.id)), rooms: f.rooms.filter((x) => m.rooms.includes(x.id)),
+    terraces: f.terraces.filter((x) => m.terraces.includes(x.id)), stairs: f.stairs.filter((x) => m.stairs.includes(x.id)),
+  });
+  function bboxOf(it) {
+    const xs = [], ys = [];
+    for (const w of it.walls) { xs.push(w.x1, w.x2); ys.push(w.y1, w.y2); }
+    for (const z of [...it.terraces, ...it.stairs]) { xs.push(z.x, z.x + z.w); ys.push(z.y, z.y + z.h); }
+    for (const r of it.rooms) { xs.push(r.x); ys.push(r.y); }
+    if (!xs.length) return null;
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  }
+  // Трансформација на елементите: kind 'mx' (лево-десно), 'my' (горе-долу), 'rot' (90° во насока на стрелките)
+  function transformItems(it, M, kind) {
+    const rnd = (v) => Math.round(v * 10) / 10;
+    for (const w of it.walls) { [w.x1, w.y1] = M(w.x1, w.y1).map(rnd); [w.x2, w.y2] = M(w.x2, w.y2).map(rnd); }
+    // Пресликување ја менува страната на која се отвора крилото
+    if (kind !== 'rot') for (const d of [...it.doors, ...it.windows]) d.flip = !d.flip;
+    for (const r of it.rooms) [r.x, r.y] = M(r.x, r.y);
+    for (const z of [...it.terraces, ...it.stairs]) {
+      const [ax, ay] = M(z.x, z.y), [bx, by] = M(z.x + z.w, z.y + z.h);
+      Object.assign(z, { x: rnd(Math.min(ax, bx)), y: rnd(Math.min(ay, by)), w: rnd(Math.abs(bx - ax)), h: rnd(Math.abs(by - ay)) });
+    }
+    for (const s of it.stairs) s.dir = kind === 'mx' ? [2, 1, 0, 3][s.dir] : kind === 'my' ? [0, 3, 2, 1][s.dir] : (s.dir + 1) % 4;
+  }
+  const mirrorFn = (kind, b) => {
+    const cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
+    if (kind === 'mx') return (x, y) => [2 * cx - x, y];
+    if (kind === 'my') return (x, y) => [x, 2 * cy - y];
+    // Вртење околу центарот залепен на мрежата → аглите остануваат на мрежата
+    const gx = snapG(cx), gy = snapG(cy);
+    return (x, y) => [gx - (y - gy), gy + (x - gx)];
+  };
+  function transformMulti(kind) {
+    const m = selAsMulti();
+    if (!m) return;
+    const it = pick(F(), m), b = bboxOf(it);
+    if (!b) return;
+    snapshot();
+    transformItems(it, mirrorFn(kind, b), kind);
+    clampOpenings();
+    refresh();
+  }
+  // Цел план (сите катови и плочата) — пресликување околу заедничкиот центар
+  function mirrorPlan(kind) {
+    const all = [...st.plan.floors, st.plan.slab].map((f) => ({ walls: f.walls, doors: f.doors, windows: f.windows, rooms: f.rooms, terraces: f.terraces, stairs: f.stairs }));
+    const boxes = all.map(bboxOf).filter(Boolean);
+    if (!boxes.length) return;
+    const b = { x0: Math.min(...boxes.map((x) => x.x0)), x1: Math.max(...boxes.map((x) => x.x1)), y0: Math.min(...boxes.map((x) => x.y0)), y1: Math.max(...boxes.map((x) => x.y1)) };
+    snapshot();
+    const M = mirrorFn(kind, b);
+    all.forEach((it) => transformItems(it, M, kind));
+    const R = st.plan.roof;
+    if (R.type === 'mono' && R.rot != null) R.rot = kind === 'mx' ? [0, 3, 2, 1][R.rot] : [2, 1, 0, 3][R.rot];
+    R.lowRot = (4 - (R.lowRot || 0)) % 4;
+    st.sel = null; st.multi = null;
+    refresh();
+  }
+  // Меѓуспомник (останува и меѓу отворања на планот → копирање меѓу катови и понуди)
+  let clip = null;
+  function copySel() {
+    const m = selAsMulti();
+    if (!m) return false;
+    const it = JSON.parse(JSON.stringify(pick(F(), m))), b = bboxOf(it);
+    if (!b) return false;
+    clip = { it, b };
+    flashHint('Копирано: ' + describe(m) + ' — Ctrl+V за залепување');
+    return true;
+  }
+  function startPaste() {
+    if (!clip) return;
+    st.sel = null; st.multi = null; st.draw = null;
+    st.paste = { dx: 0, dy: 0 };
+    $('#plHint').textContent = HINTS.paste;
+    refresh();
+  }
+  function commitPaste() {
+    const f = F(), { dx, dy } = st.paste, src = JSON.parse(JSON.stringify(clip.it)), map = {}, m = emptyMulti();
+    snapshot();
+    for (const w of src.walls) { map[w.id] = uid(); f.walls.push({ ...w, id: map[w.id], x1: w.x1 + dx, y1: w.y1 + dy, x2: w.x2 + dx, y2: w.y2 + dy }); m.walls.push(map[w.id]); }
+    for (const [k, list] of [['doors', src.doors], ['windows', src.windows]]) for (const d of list) {
+      if (!map[d.wall]) continue;
+      const n = { ...d, id: uid(), wall: map[d.wall] };
+      f[k].push(n); m[k].push(n.id);
+    }
+    for (const r of src.rooms) { const n = { ...r, id: uid(), x: r.x + dx, y: r.y + dy }; f.rooms.push(n); m.rooms.push(n.id); }
+    for (const k of ['terraces', 'stairs']) for (const z of src[k]) { const n = { ...z, id: uid(), x: z.x + dx, y: z.y + dy }; f[k].push(n); m[k].push(n.id); }
+    st.paste = null;
+    st.multi = m;
+    setTool('box');
+  }
+  function deleteMulti() {
+    const f = F(), m = st.multi;
+    snapshot();
+    f.walls = f.walls.filter((w) => !m.walls.includes(w.id));
+    f.doors = f.doors.filter((d) => !m.doors.includes(d.id) && f.walls.some((w) => w.id === d.wall));
+    f.windows = f.windows.filter((d) => !m.windows.includes(d.id) && f.walls.some((w) => w.id === d.wall));
+    for (const k of ['rooms', 'terraces', 'stairs']) f[k] = f[k].filter((x) => !m[k].includes(x.id));
+    st.multi = null;
+    refresh();
+  }
+  function describe(m) {
+    const parts = [[m.walls.length, 'ѕид', 'ѕида'], [m.doors.length + m.windows.length, 'отвор', 'отвори'], [m.rooms.length, 'просторија', 'простории'],
+      [m.terraces.length, 'тераса', 'тераси'], [m.stairs.length, 'скали', 'скали']];
+    return parts.filter(([n]) => n).map(([n, one, many]) => n + ' ' + (n === 1 ? one : many)).join(', ') || 'ништо';
+  }
+  function flashHint(t) {
+    const el = $('#plHint');
+    el.textContent = t;
+    clearTimeout(flashHint.tm);
+    flashHint.tm = setTimeout(() => { el.textContent = HINTS[st.paste ? 'paste' : st.view3d ? '3d' : roomTool(st.tool) ? 'room' : st.tool] || ''; }, 2600);
+  }
+  // Влечење на избраното: ѕидовите што се допираат се растегнуваат заедно
+  function startGroupDrag(m0) {
+    const it = pick(F(), st.multi), pts = new Map();
+    for (const w of it.walls) for (const e of [1, 2]) {
+      const k = w['x' + e] + ',' + w['y' + e];
+      if (!pts.has(k)) pts.set(k, { x: w['x' + e], y: w['y' + e], ends: endsAt(w['x' + e], w['y' + e]) });
+    }
+    snapshot();
+    st.drag = { type: 'group', m0, pts: [...pts.values()], z: [...it.terraces, ...it.stairs].map((z) => ({ z, x: z.x, y: z.y })), r: it.rooms.map((r) => ({ r, x: r.x, y: r.y })), moved: false };
+  }
+
+  // ── Мерка на ѕид: клик → поле за нова должина ──
+  function openDimEdit(id) {
+    const f = F(), w = wallById(f, id), el = svg.querySelector(`[data-dim="${id}"]`);
+    if (!w || !el) return;
+    closeDimEdit();
+    const box = root.querySelector('.pl-canvas'), r = el.getBoundingClientRect(), cr = box.getBoundingClientRect();
+    const inp = document.createElement('input');
+    inp.type = 'number'; inp.min = '5'; inp.step = '1'; inp.className = 'pl-dimedit';
+    inp.value = Math.round(wlen(w));
+    inp.style.left = (r.left - cr.left + r.width / 2) + 'px';
+    inp.style.top = (r.top - cr.top + r.height / 2) + 'px';
+    box.appendChild(inp);
+    inp.focus(); inp.select();
+    let done = false;
+    const apply = () => {
+      if (done) return; done = true;
+      const v = parseFloat(inp.value);
+      inp.remove();
+      if (!(v >= 5) || Math.abs(v - wlen(w)) < 0.5) return;
+      // Почетокот стои, крајот (и поврзаните ѕидови) се поместува по правецот
+      snapshot();
+      const { ux, uy } = wdir(w);
+      moveEnds(endsAt(w.x2, w.y2), Math.round(w.x1 + ux * v), Math.round(w.y1 + uy * v));
+      clampOpenings();
+      refresh();
+    };
+    inp.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); apply(); }
+      if (e.key === 'Escape') { e.preventDefault(); done = true; inp.remove(); }
+      e.stopPropagation();
+    });
+    inp.addEventListener('blur', apply);
+  }
+  function closeDimEdit() { const old = root && root.querySelector('.pl-dimedit'); if (old) old.blur(); }
 
   // ── Цртање (SVG) ──
   function render() {
@@ -682,7 +925,8 @@
     }
 
     // Мерки на ѕидовите (cm)
-    for (const w of f.walls) h += dimLabel(w.x1, w.y1, w.x2, w.y2, thick(w), isSel('wall', w.id));
+    const dimEdit = (st.tool === 'select' || st.tool === 'box') && !st.draw && !st.paste;
+    for (const w of f.walls) h += dimLabel(w.x1, w.y1, w.x2, w.y2, thick(w), isSel('wall', w.id), dimEdit ? w.id : null);
     // Внатрешни (светли) мерки на просториите — се вклучуваат/исклучуваат од лентата со алатки
     if (st.innerDims && !isSlab()) h += innerDimsSvg(f, L);
 
@@ -704,7 +948,35 @@
       h += dimLabel(a.x, a.y, b.x, b.y, T, true);
       h += `<circle cx="${x1}" cy="${y1}" r="4" fill="var(--accent)"/>`;
     }
-    if (st.cursor && (st.tool === 'out' || st.tool === 'in')) {
+    // Правоаголник од ѕидови: преглед со мерки
+    if (st.drag && st.drag.type === 'wallrect' && st.drag.b) {
+      const a = st.drag.a, b = st.drag.b, x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x), y0 = Math.min(a.y, b.y), y1 = Math.max(a.y, b.y);
+      const [sx, sy] = toS(x0, y0), kindIn = !isSlab() && (outerLoops(f) || []).some((lp) => inPoly(lp, (x0 + x1) / 2, (y0 + y1) / 2));
+      const T = isSlab() ? SLAB_EDGE : THICK[kindIn ? 'in' : 'out'];
+      h += `<rect x="${sx}" y="${sy}" width="${(x1 - x0) * s}" height="${(y1 - y0) * s}" fill="rgba(219,75,59,.05)" stroke="var(--accent)" stroke-opacity=".6" stroke-width="${Math.max(3, T * s)}"/>`;
+      h += dimLabel(x0, y0, x1, y0, T, true) + dimLabel(x1, y0, x1, y1, T, true);
+      h += `<text x="${sx + (x1 - x0) * s / 2}" y="${sy + (y1 - y0) * s / 2}" class="pl-zlabel" text-anchor="middle">${isSlab() ? 'Ивица на плоча' : kindIn ? 'Внатрешни ѕидови' : 'Надворешни ѕидови'} · ${fmt((x1 - x0) * (y1 - y0) / 1e4)} m²</text>`;
+    }
+    // Избор со правоаголник
+    if (st.drag && st.drag.type === 'box') {
+      const a = st.drag.a, b = st.drag.b, [sx, sy] = toS(Math.min(a.x, b.x), Math.min(a.y, b.y));
+      h += `<rect x="${sx}" y="${sy}" width="${Math.abs(b.x - a.x) * s}" height="${Math.abs(b.y - a.y) * s}" class="pl-boxsel"/>`;
+    }
+    // Рамка околу избраното
+    if (st.multi) {
+      const bb = bboxOf(pick(f, st.multi));
+      if (bb) { const [sx, sy] = toS(bb.x0, bb.y0); h += `<rect x="${sx - 10}" y="${sy - 10}" width="${(bb.x1 - bb.x0) * s + 20}" height="${(bb.y1 - bb.y0) * s + 20}" class="pl-multibox"/>`; }
+    }
+    // Залепување: сенка што го следи курсорот
+    if (st.paste && clip) {
+      const { dx, dy } = st.paste, it = clip.it;
+      for (const w of it.walls) {
+        const [x1, y1] = toS(w.x1 + dx, w.y1 + dy), [x2, y2] = toS(w.x2 + dx, w.y2 + dy);
+        h += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--accent)" stroke-opacity=".5" stroke-width="${Math.max(3, THICK[w.kind] * s)}" stroke-linecap="square"/>`;
+      }
+      for (const z of [...it.terraces, ...it.stairs]) { const [x, y] = toS(z.x + dx, z.y + dy); h += `<rect x="${x}" y="${y}" width="${z.w * s}" height="${z.h * s}" fill="rgba(219,75,59,.08)" stroke="var(--accent)" stroke-dasharray="4 3"/>`; }
+    }
+    if (st.cursor && (st.tool === 'out' || st.tool === 'in' || st.tool === 'rect')) {
       const [cx, cy] = toS(st.cursor.x, st.cursor.y), sn = st.cursor.snap;
       // Залепено: квадрат на агол, ромб на ѕид; инаку круг
       if (sn === 'point') h += `<rect x="${cx - 6}" y="${cy - 6}" width="12" height="12" class="pl-snap"/>`;
@@ -807,7 +1079,7 @@
     return `<g ${ghost ? 'opacity=".6"' : `data-hit="win:${o.id}"`}>${g}</g>`;
   }
 
-  function dimLabel(ax, ay, bx, by, thick, strong) {
+  function dimLabel(ax, ay, bx, by, thick, strong, editId) {
     const L = Math.hypot(bx - ax, by - ay);
     if (L < 1) return '';
     const s = st.view.s;
@@ -819,10 +1091,11 @@
     const nx = -(y2 - y1) / Math.hypot(x2 - x1, y2 - y1), ny = (x2 - x1) / Math.hypot(x2 - x1, y2 - y1);
     const mx = (x1 + x2) / 2 - nx * off, my = (y1 + y2) / 2 - ny * off;
     if (ang > 90 || ang < -90) ang += 180;
-    return `<text x="${mx}" y="${my}" class="pl-dim${strong ? ' strong' : ''}" text-anchor="middle" dominant-baseline="middle" transform="rotate(${ang} ${mx} ${my})">${Math.round(L)}</text>`;
+    const ed = editId ? ` data-dim="${editId}"` : '';
+    return `<text x="${mx}" y="${my}" class="pl-dim${strong ? ' strong' : ''}${editId ? ' ed' : ''}"${ed} text-anchor="middle" dominant-baseline="middle" transform="rotate(${ang} ${mx} ${my})">${editId ? '<title>Клик за нова должина</title>' : ''}${Math.round(L)}</text>`;
   }
 
-  const isSel = (type, id) => st.sel && st.sel.type === type && st.sel.id === id;
+  const isSel = (type, id) => (st.sel && st.sel.type === type && st.sel.id === id) || inMulti(type, id);
 
   // Внатрешни (светли) мерки на затворен простор: секој раб се поместува навнатре за половина
   // дебелина на својот ѕид, соседните прави се сечат → внатрешен полигон; мерка по секој раб.
@@ -877,6 +1150,14 @@
     let h = '';
     const sel = st.sel;
     const num = (id, label, v, min, step) => `<div class="field"><label>${label} <span class="unit">cm</span></label><input type="number" min="${min}" step="${step}" id="${id}" value="${Math.round(v)}"></div>`;
+    if (st.multi) {
+      h += `<div class="pl-box"><h5>Избрано</h5><p class="hint" style="margin:0;">${describe(st.multi)}. Влечи го избраното за поместување.</p>
+        <div class="pl-2"><button class="btn ghost small" id="plMX" title="Пресликај лево–десно">⇋ Пресликај</button><button class="btn ghost small" id="plMY" title="Пресликај горе–долу">⇵ Пресликај</button></div>
+        <div class="pl-2"><button class="btn ghost small" id="plRot">⟳ Сврти 90°</button><button class="btn ghost small" id="plCopySel" title="Ctrl+C">⧉ Копирај</button></div>
+        <button class="btn danger small" id="plDelMulti">Избриши избраното</button></div>`;
+    }
+    if (clip && !st.paste && !isSlab()) h += `<div class="pl-box"><h5>Меѓуспомник</h5><p class="hint" style="margin:0;">${describe(Object.fromEntries(MKEYS.map((k) => [k, clip.it[k]])))}</p>
+      <button class="btn ghost small" id="plPaste" title="Ctrl+V">📋 Залепи</button></div>`;
     if (sel && sel.type === 'wall') {
       const w = wallById(f, sel.id);
       if (w) h += `<div class="pl-box"><h5>Ѕид</h5>
@@ -923,7 +1204,7 @@
     }
 
     // Висини на катовите и кров — кога ништо не е избрано
-    if (!sel) {
+    if (!sel && !st.multi) {
       const R = st.plan.roof, RG = roofGeom();
       const hIn = (i) => `<div class="field"><label>${st.plan.floors.length === 2 ? floorName(i) : 'Висина на кат'} <span class="unit">m</span></label><input type="number" min="2" max="6" step="0.05" data-fh="${i}" value="${r2(st.plan.floors[i].h / 100)}"></div>`;
       const rotLbl = R.type === 'mono' ? '⟳ Сврти наклон' : R.type === 'gable' ? '⟳ Сврти слеме' : '';
@@ -945,6 +1226,10 @@
         : '<p class="hint">Кровот се пресметува кога надворешните ѕидови се затворени.</p>'}</div>`;
     }
 
+    if (!sel && !st.multi && st.plan.floors.some((x) => x.walls.length)) {
+      h += `<div class="pl-box"><h5>Цел план</h5><p class="hint" style="margin:0;">Пресликај ги сите катови и плочата (пр. истиот модел во огледална верзија).</p>
+        <div class="pl-2"><button class="btn ghost small" id="plPlanMX">⇋ Лево–десно</button><button class="btn ghost small" id="plPlanMY">⇵ Горе–долу</button></div></div>`;
+    }
     if (st.floor === 1 && !f.walls.length && st.plan.floors[0].walls.some((w) => w.kind === 'out')) {
       h += `<div class="pl-box"><h5>Празен кат</h5><p class="hint">Почни од основата на првиот кат и смени ја по потреба.</p>
         <button class="btn ghost small" id="plCopy">Копирај надворешни ѕидови од прв кат</button></div>`;
@@ -1015,6 +1300,14 @@
     const numIn = (id, min, fn) => on(id, 'change', (e) => { const v = parseFloat(e.target.value); if (v >= min) edit((it) => fn(it, v)); });
 
     on('#plDel', 'click', delSel);
+    on('#plMX', 'click', () => transformMulti('mx'));
+    on('#plMY', 'click', () => transformMulti('my'));
+    on('#plRot', 'click', () => transformMulti('rot'));
+    on('#plCopySel', 'click', () => { copySel(); renderPanel(); });
+    on('#plDelMulti', 'click', deleteMulti);
+    on('#plPaste', 'click', startPaste);
+    on('#plPlanMX', 'click', () => mirrorPlan('mx'));
+    on('#plPlanMY', 'click', () => mirrorPlan('my'));
     panel.querySelectorAll('[data-kind]').forEach((b) => { b.onclick = () => { if (item().kind !== b.dataset.kind) edit((w) => { w.kind = b.dataset.kind; }); }; });
     numIn('#plLen', 5, (w, L) => {
       // Почетокот стои, крајот (и поврзаните ѕидови) се поместува по правецот
@@ -1092,10 +1385,13 @@
           return { t: o.t, w: o.w, bottom, top: Math.min(bottom + o.h, H - 10), glass: true };
         }),
       ];
+      // Натписи: „Спална“, „Спална 2“ … кога ист тип се повторува на катот
+      const seen = {};
+      const label = (type) => { seen[type] = (seen[type] || 0) + 1; return ROOMS[type].label + (seen[type] > 1 ? ' ' + seen[type] : ''); };
       const fl = {
         base, h: H, loops: outerLoops(f) || [],
         walls: f.walls.map((w) => ({ x1: w.x1, y1: w.y1, x2: w.x2, y2: w.y2, kind: w.kind, T: THICK[w.kind], ops: ops(w) })),
-        rooms: L.faces.filter((fc) => fc.room).map((fc) => ({ pts: fc.pts, type: fc.room.type, floor: ROOMS[fc.room.type].fixed ? (fc.room.type === 'garaza' ? 'garaza' : 'plochki') : fc.room.floor })),
+        rooms: L.faces.filter((fc) => fc.room).map((fc) => ({ pts: fc.pts, type: fc.room.type, label: label(fc.room.type), floor: ROOMS[fc.room.type].fixed ? (fc.room.type === 'garaza' ? 'garaza' : 'plochki') : fc.room.floor })),
         terraces: f.terraces.map((t) => ({ ...t })),
         stairs: f.stairs.map((x) => ({ ...x, steps: stairSteps(f) })),
       };
@@ -1117,16 +1413,17 @@
   function syncToolbar() {
     const slab = isSlab();
     root.querySelectorAll('.pl-tool[data-tool], .pl-group').forEach((el) => {
-      el.style.display = slab && !['select', 'out'].includes(el.dataset.tool) ? 'none' : '';
+      el.style.display = slab && !['select', 'box', 'out', 'rect'].includes(el.dataset.tool) ? 'none' : '';
     });
     const out = root.querySelector('.pl-tool[data-tool="out"] .pl-tl');
     if (out) out.textContent = slab ? 'Ивица на плоча' : 'Надворешен ѕид';
   }
 
   function setTool(t) {
-    if (isSlab() && !['select', 'out'].includes(t)) t = 'out';
+    if (isSlab() && !['select', 'box', 'out', 'rect'].includes(t)) t = 'out';
     syncToolbar();
-    st.tool = t; st.draw = null; st.typed = ''; st.ghost = null; st.hover = null;
+    st.tool = t; st.draw = null; st.typed = ''; st.ghost = null; st.hover = null; st.paste = null;
+    if (t !== 'select' && t !== 'box') st.multi = null;
     if (t !== 'select' && !roomTool(t)) st.sel = null;
     root.querySelectorAll('.pl-tool[data-tool]').forEach((b) => b.classList.toggle('on', b.dataset.tool === t));
     $('#plHint').textContent = HINTS[st.view3d ? '3d' : roomTool(t) ? 'room' : isSlab() && t === 'out' ? 'slab' : t];
@@ -1166,6 +1463,21 @@
     svg.setPointerCapture(e.pointerId);
     if (e.button === 1 || st.space) { st.drag = { type: 'pan', px, py, tx: st.view.tx, ty: st.view.ty }; return; }
     const f = F(), t = st.tool, m = toW(px, py);
+
+    // Залепување: клик го остава копираното
+    if (st.paste) { commitPaste(); return; }
+    // Клик на мерка на ѕид → внес на должина (по настанот, за полето да го задржи фокусот)
+    const dimEl = e.target.closest('[data-dim]');
+    if (dimEl && (t === 'select' || t === 'box')) { e.preventDefault(); const id = dimEl.dataset.dim; setTimeout(() => openDimEdit(id), 0); return; }
+    if (t === 'rect') { st.drag = { type: 'wallrect', a: drawPoint(px, py), b: null }; return; }
+    if (t === 'box') {
+      const hb = e.target.closest('[data-hit]');
+      if (st.multi && hb) { const [k0, id0] = hb.dataset.hit.split(':'); if (inMulti(k0, id0)) { startGroupDrag(m); return; } }
+      st.multi = null; st.sel = null;
+      st.drag = { type: 'box', a: m, b: m };
+      refresh();
+      return;
+    }
 
     if (t === 'out' || t === 'in') {
       const p = drawPoint(px, py, st.draw && st.draw.from, e.shiftKey);
@@ -1213,8 +1525,10 @@
       return;
     }
 
-    // Избор
+    // Избор; влечење на дел од избраната област ја поместува целата
     const hit = e.target.closest('[data-hit]');
+    if (st.multi && hit) { const [k0, id0] = hit.dataset.hit.split(':'); if (inMulti(k0, id0)) { startGroupDrag(m); return; } }
+    st.multi = null;
     if (!hit) { st.sel = null; st.drag = { type: 'pan', px, py, tx: st.view.tx, ty: st.view.ty }; refresh(); return; }
     const [kind, id, end] = hit.dataset.hit.split(':');
     if (kind === 'wh') {
@@ -1246,6 +1560,18 @@
   function onMove(e) {
     const { px, py } = ptr(e), d = st.drag, f = F();
     if (d && d.type === 'pan') { st.view.tx = d.tx + px - d.px; st.view.ty = d.ty + py - d.py; render(); return; }
+    if (st.paste && clip) {
+      const m = toW(px, py), b = clip.b;
+      st.paste.dx = snapG(m.x - (b.x0 + b.x1) / 2); st.paste.dy = snapG(m.y - (b.y0 + b.y1) / 2);
+      render();
+      return;
+    }
+    if (st.tool === 'rect') {
+      st.cursor = drawPoint(px, py);
+      if (d && d.type === 'wallrect') d.b = st.cursor;
+      render();
+      return;
+    }
     if (st.tool === 'out' || st.tool === 'in') {
       st.cursor = drawPoint(px, py, st.draw && st.draw.from, e.shiftKey);
       if (st.draw) { st.draw.cur = st.cursor; st.typed = ''; }
@@ -1277,6 +1603,14 @@
       d.z.x = d.o.x + snapG(m.x - d.m0.x); d.z.y = d.o.y + snapG(m.y - d.m0.y); d.moved = true;
     } else if (d.type === 'rsize') {
       d.z.w = Math.max(20, snapG(m.x - d.z.x)); d.z.h = Math.max(20, snapG(m.y - d.z.y));
+    } else if (d.type === 'box') {
+      d.b = m;
+    } else if (d.type === 'group') {
+      const dx = snapG(m.x - d.m0.x), dy = snapG(m.y - d.m0.y);
+      for (const p of d.pts) moveEnds(p.ends, p.x + dx, p.y + dy);
+      for (const o of d.z) { o.z.x = o.x + dx; o.z.y = o.y + dy; }
+      for (const o of d.r) { o.r.x = o.x + dx; o.r.y = o.y + dy; }
+      clampOpenings(); d.moved = true;
     }
     render();
   }
@@ -1285,6 +1619,13 @@
     const d = st.drag;
     st.drag = null;
     if (!d) return;
+    if (d.type === 'wallrect') { if (d.b) addRect(d.a, d.b); else render(); return; }
+    if (d.type === 'box') {
+      const r = { x0: Math.min(d.a.x, d.b.x), x1: Math.max(d.a.x, d.b.x), y0: Math.min(d.a.y, d.b.y), y1: Math.max(d.a.y, d.b.y) };
+      st.multi = r.x1 - r.x0 > 5 || r.y1 - r.y0 > 5 ? collect(F(), r) : null;
+      refresh();
+      return;
+    }
     if (d.type === 'newrect') {
       if (d.z && d.z.w >= 20 && d.z.h >= 20) {
         snapshot();
@@ -1298,7 +1639,7 @@
       return;
     }
     // Клик без поместување не треба да остави чекор во историјата
-    if (['wall', 'open', 'rect', 'end'].includes(d.type) && !d.moved) st.hist.pop();
+    if (['wall', 'open', 'rect', 'end', 'group'].includes(d.type) && !d.moved) st.hist.pop();
     if (d.type !== 'pan') refresh();
   }
 
@@ -1316,9 +1657,11 @@
     if (e.key === ' ' && !typing) { st.space = e.type === 'keydown'; e.preventDefault(); return; }
     if (e.type !== 'keydown') return;
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); undo(); return; }
+    if ((e.ctrlKey || e.metaKey) && !typing && !st.view3d && e.key.toLowerCase() === 'c') { if (copySel()) { e.preventDefault(); renderPanel(); } return; }
+    if ((e.ctrlKey || e.metaKey) && !typing && !st.view3d && e.key.toLowerCase() === 'v') { if (clip && !isSlab()) { e.preventDefault(); startPaste(); } return; }
     if (typing) return;
-    if (e.key === 'Escape') { e.preventDefault(); if (st.draw) endChain(); else { st.sel = null; refresh(); } return; }
-    if ((e.key === 'Delete' || e.key === 'Backspace') && st.sel) { e.preventDefault(); delSel(); return; }
+    if (e.key === 'Escape') { e.preventDefault(); if (st.paste) { st.paste = null; setTool(st.tool); } else if (st.draw) endChain(); else { st.sel = null; st.multi = null; refresh(); } return; }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && (st.sel || st.multi) && !st.draw) { e.preventDefault(); if (st.multi) deleteMulti(); else delSel(); return; }
     // Внес на точна должина при цртање
     if (st.draw) {
       if (/^[0-9]$/.test(e.key) || (e.key === '.' && !st.typed.includes('.'))) { st.typed += e.key; render(); e.preventDefault(); return; }
@@ -1428,13 +1771,13 @@
           st.plan.floors.splice(1);
           st.floor = 0;
         } else st.floor = Number(b.dataset.floor);
-        st.sel = null; st.draw = null;
+        st.sel = null; st.draw = null; st.multi = null;
         renderFloors(); fit();
         if (st.view3d) refresh(); else setTool(st.tool);
       };
     });
     box.querySelector('[data-slab]').onclick = () => {
-      st.floor = SLAB; st.sel = null; st.draw = null;
+      st.floor = SLAB; st.sel = null; st.draw = null; st.multi = null;
       renderFloors(); fit();
       // Празна плоча → веднаш цртање на ивицата
       if (st.view3d) refresh(); else setTool(st.plan.slab.walls.length ? 'select' : 'out');
@@ -1443,7 +1786,7 @@
     if (add) add.onclick = () => {
       snapshot();
       st.plan.floors.push(emptyFloor(st.plan.floors[0].h));
-      st.floor = 1; st.sel = null; st.draw = null;
+      st.floor = 1; st.sel = null; st.draw = null; st.multi = null;
       renderFloors(); fit();
       if (st.view3d) refresh(); else setTool('out');
     };
@@ -1473,7 +1816,7 @@
     if (opts.floors === 2 && p.floors.length < 2) p.floors.push(emptyFloor(hDef(1)));
     p.roof = Object.assign({}, ROOF_DEF, p.roof);
     p.slab = Object.assign(emptyFloor(), p.slab, { doors: [], windows: [], rooms: [], terraces: [], stairs: [] });
-    st = { plan: p, floor: 0, tool: 'out', view3d: false, view: { s: 0.5, tx: 60, ty: 60 }, sel: null, draw: null, drag: null, typed: '', hist: [], dirty: false,
+    st = { plan: p, floor: 0, tool: 'out', view3d: false, view: { s: 0.5, tx: 60, ty: 60 }, sel: null, multi: null, paste: null, draw: null, drag: null, typed: '', hist: [], dirty: false,
       opts: Object.assign({ floors: 1, labels: {}, eurM2: 150 }, opts), onApply };
     // Внатрешните мерки се стандардно вклучени; изборот се памети во прелистувачот
     try { st.innerDims = localStorage.getItem('mdaInnerDims') !== '0'; } catch (e) { st.innerDims = true; }

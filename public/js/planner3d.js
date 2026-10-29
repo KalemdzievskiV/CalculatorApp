@@ -69,7 +69,10 @@
 
   let ground, matKey = '', previewR = null;
   let T = null, loading = null, holder, renderer, scene, camera, group, sun, model, needFit = true, ro;
-  const show = { roof: true, upper: true };
+  // mode: 'out' = однадвор (со кров), 'in' = одвнатре (без кров, до катот level, со натписи)
+  const show = { mode: 'out', level: 0, furniture: true, garden: true };
+  let labels = [];
+  try { const s = JSON.parse(localStorage.getItem('mda3dShow') || '{}'); if (typeof s.furniture === 'boolean') show.furniture = s.furniture; if (typeof s.garden === 'boolean') show.garden = s.garden; } catch (e) { /* без меморија */ }
   const cam = { theta: 0.75, phi: 1.0, dist: 3000, target: null };
 
   function load() {
@@ -197,12 +200,30 @@
   function attach(el) {
     holder = el;
     if (!holder.querySelector('.p3-opts')) {
-      holder.insertAdjacentHTML('beforeend', `<div class="p3-opts">
-        <label><input type="checkbox" data-o="roof" checked> Кров</label>
-        <label><input type="checkbox" data-o="upper" checked> Втор кат</label>
+      holder.insertAdjacentHTML('beforeend', `<div class="p3-labels"></div><div class="p3-opts">
+        <div class="seg pl-seg"><button type="button" class="seg-btn on" data-mode="out">Однадвор</button><button type="button" class="seg-btn" data-mode="in">Одвнатре</button></div>
+        <div class="seg pl-seg p3-level"><button type="button" class="seg-btn on" data-level="0">Прв кат</button><button type="button" class="seg-btn" data-level="1">Втор кат</button></div>
+        <label><input type="checkbox" data-o="furniture"${show.furniture ? ' checked' : ''}> Мебел</label>
+        <label><input type="checkbox" data-o="garden"${show.garden ? ' checked' : ''}> Двор</label>
         <button type="button" class="btn ghost small" data-o="fit">⤢ Центрирај</button></div>
         <div class="p3-msg"></div>`);
-      holder.querySelectorAll('input[data-o]').forEach((c) => { c.onchange = () => { show[c.dataset.o] = c.checked; build(); }; });
+      holder.querySelectorAll('input[data-o]').forEach((c) => {
+        c.onchange = () => {
+          show[c.dataset.o] = c.checked;
+          try { localStorage.setItem('mda3dShow', JSON.stringify({ furniture: show.furniture, garden: show.garden })); } catch (e) { /* без меморија */ }
+          build();
+        };
+      });
+      holder.querySelectorAll('[data-mode]').forEach((b) => {
+        b.onclick = () => {
+          if (show.mode === b.dataset.mode) return;
+          show.mode = b.dataset.mode;
+          // Одвнатре: поглед повеќе одозгора, на највисокиот кат
+          if (show.mode === 'in') { cam.phi = Math.min(cam.phi, 0.62); show.level = model ? model.floors.length - 1 : 0; } else cam.phi = Math.max(cam.phi, 0.95);
+          build();
+        };
+      });
+      holder.querySelectorAll('[data-level]').forEach((b) => { b.onclick = () => { show.level = +b.dataset.level; build(); }; });
       holder.querySelector('button[data-o="fit"]').onclick = () => { needFit = true; build(); };
     }
     if (renderer && renderer.domElement.parentNode !== holder) holder.prepend(renderer.domElement);
@@ -226,6 +247,26 @@
     camera.position.set(target.x + dist * Math.sin(phi) * Math.sin(theta), target.y + dist * Math.cos(phi), target.z + dist * Math.sin(phi) * Math.cos(theta));
     camera.lookAt(target);
     renderer.render(scene, camera);
+    placeLabels();
+  }
+
+  // Натписи на просториите (HTML над платното), само во погледот одвнатре
+  function placeLabels() {
+    const box = holder && holder.querySelector('.p3-labels');
+    if (!box) return;
+    const list = show.mode === 'in' ? labels : [];
+    if (box.childElementCount !== list.length || box.dataset.key !== list.map((l) => l.text).join('|')) {
+      box.innerHTML = list.map((l) => `<span class="p3-label">${String(l.text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))}</span>`).join('');
+      box.dataset.key = list.map((l) => l.text).join('|');
+    }
+    const w = holder.clientWidth, h = holder.clientHeight, v = new T.Vector3();
+    list.forEach((l, i) => {
+      const el = box.children[i];
+      v.set(l.x, l.y, l.z).project(camera);
+      const off = v.z > 1 || Math.abs(v.x) > 1.1 || Math.abs(v.y) > 1.1;
+      el.style.display = off ? 'none' : '';
+      if (!off) el.style.transform = `translate(${((v.x + 1) / 2) * w}px, ${((1 - v.y) / 2) * h}px) translate(-50%, -50%)`;
+    });
   }
   // Повеќе настани во ист фрејм (влечење, тркалце) → едно цртање
   let drawQueued = false;
@@ -568,8 +609,18 @@
     if (group) { scene.remove(group); group.traverse((o) => { if (o.geometry) o.geometry.dispose(); }); }
     group = new T.Group();
     scene.add(group);
-    const fl = model.floors, r = model.roof;
-    const shown = fl.filter((_, i) => i === 0 || show.upper);
+    const fl = model.floors, r = model.roof, inside = show.mode === 'in';
+    const level = Math.min(show.level, fl.length - 1);
+    // Одвнатре: катовите до избраниот, без кров
+    const shown = inside ? fl.slice(0, level + 1) : fl;
+    const roofOn = !inside;
+    labels = [];
+    if (holder) {
+      const lv = holder.querySelector('.p3-level');
+      lv.style.display = inside && fl.length === 2 ? '' : 'none';
+      lv.querySelectorAll('[data-level]').forEach((b) => b.classList.toggle('on', +b.dataset.level === level));
+      holder.querySelectorAll('[data-mode]').forEach((b) => b.classList.toggle('on', b.dataset.mode === show.mode));
+    }
     // Бетонска плоча: горе малку под подот на куќата (без треперење), дебелина 20 cm над тревата
     for (const lp of model.slab || []) slab(lp, -2, 20, baseSlabMat);
     shown.forEach((f, i) => {
@@ -582,20 +633,25 @@
         g.translate(0, f.base + 0.6, 0);
         mesh(g, floorMats[rm.floor] || floorMats.laminat, false);
       }
-      const isTop = r && i === r.top && show.roof;
-      const lowR = i === 0 && model.lowRoof && show.roof ? lowTop(model.lowRoof.parts, f.h) : null;
+      const isTop = r && i === r.top && roofOn;
+      const lowR = i === 0 && model.lowRoof && roofOn ? lowTop(model.lowRoof.parts, f.h) : null;
       for (const w of f.walls) wall(w, f.base, f.h, isTop && w.kind === 'out' ? roofTop(r.parts, f.h) : lowR && w.kind === 'out' ? lowR : null, w.kind === 'out' ? wallMat : wallInMat, { loops: f.loops, ground: i === 0, inMat: wallOutInMat });
       for (const x of f.stairs) stairs(x, f.base, f.h);
       for (const t of f.terraces) terrace(t, f.base, f.h);
+      // Мебел по просториите; натписите се за најгорниот прикажан кат
+      if (window.MDA3DProps) {
+        const lb = window.MDA3DProps.furnish(T, f, (o) => group.add(o), show.furniture);
+        if (i === shown.length - 1) labels = lb;
+      }
     });
-    // Рамен покрив над делот од првиот кат што го нема вториот (без кров и втор кат → отворено, за поглед внатре)
-    if (fl.length === 2 && (show.upper || show.roof)) {
+    // Плоча над првиот кат (под вториот кат, и рамен покрив над делот без втор кат)
+    if (fl.length === 2 && shown.length === 2) {
       const f0 = fl[0];
-      for (const lp of f0.loops) slab(lp, f0.base + f0.h - 0.5, 20, show.upper ? slabMat : roofMat);
+      for (const lp of f0.loops) slab(lp, f0.base + f0.h - 0.5, 20, slabMat);
     }
-    if (r && show.roof && (r.top === 0 || show.upper)) roof(r, fl[r.top].base + fl[r.top].h);
+    if (r && roofOn) roof(r, fl[r.top].base + fl[r.top].h);
     // Еднокосен кров над деловите од првиот кат без ништо над нив
-    if (model.lowRoof && show.roof) roof(model.lowRoof, fl[0].base + fl[0].h);
+    if (model.lowRoof && roofOn) roof(model.lowRoof, fl[0].base + fl[0].h);
 
     // Сонце и сенки според големината на моделот
     const bb = new T.Box3().setFromObject(group);
@@ -611,14 +667,20 @@
       pg.translate(0, -18, 0);
       mesh(pg, paverMat, false);
     }
+    // Двор: ограда, патека до влезот, дрвја, базен, огниште (околу целата куќа со кровот)
+    let Rs = R;
+    if (!empty && show.garden && window.MDA3DProps) {
+      const P = window.MDA3DProps.garden(T, { house: houseRect(), door: frontDoor(), paverMat }, (o) => group.add(o));
+      Rs = Math.max(R, (P.x1 - P.x0) / 2, (P.y1 - P.y0) / 2) * 1.05;
+    }
     // Тревата се топи во хоризонтот подалеку од куќата
-    scene.fog.near = Math.max(R * 6, 6000);
+    scene.fog.near = Math.max(Rs * 4, R * 6, 6000);
     scene.fog.far = scene.fog.near * 5;
     // Сонце од предна десна страна во однос на почетната камера — видливите ѕидови се осветлени
-    sun.position.set(c.x + R * 1.3, c.y + R * 1.6, c.z + R * 0.5);
+    sun.position.set(c.x + Rs * 1.3, c.y + Rs * 1.6, c.z + Rs * 0.5);
     sun.target.position.copy(c);
     const sc = sun.shadow.camera;
-    sc.left = -R * 1.5; sc.right = R * 1.5; sc.top = R * 1.5; sc.bottom = -R * 1.5; sc.near = 10; sc.far = R * 6;
+    sc.left = -Rs * 1.5; sc.right = Rs * 1.5; sc.top = Rs * 1.5; sc.bottom = -Rs * 1.5; sc.near = 10; sc.far = Rs * 6;
     sc.updateProjectionMatrix();
     renderer.shadowMap.needsUpdate = true;
     if (needFit && !empty) {
@@ -629,6 +691,34 @@
     }
     resize();
     draw();
+  }
+
+  // Опфат на куќата во план (ѕидови, тераси, плоча, кров со препуст), за дворот
+  function houseRect() {
+    const xs = [], ys = [];
+    const pt = (x, y) => { xs.push(x); ys.push(y); };
+    for (const f of model.floors) {
+      for (const w of f.walls) { pt(w.x1, w.y1); pt(w.x2, w.y2); }
+      for (const t of f.terraces) { pt(t.x, t.y); pt(t.x + t.w, t.y + t.h); }
+    }
+    for (const lp of model.slab || []) lp.forEach(([x, y]) => pt(x, y));
+    for (const R of [model.roof, model.lowRoof]) if (R) for (const p of R.parts) p.outline.forEach(([x, y]) => pt(x, y));
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  }
+  // Влезна врата: прва врата (не стаклена) на надворешен ѕид од приземјето, со нормала нанадвор
+  function frontDoor() {
+    const f = model.floors[0];
+    for (const w of f.walls) {
+      if (w.kind !== 'out') continue;
+      const L = Math.hypot(w.x2 - w.x1, w.y2 - w.y1);
+      const o = w.ops.find((x) => !x.glass);
+      if (!o || L < 1) continue;
+      const ux = (w.x2 - w.x1) / L, uy = (w.y2 - w.y1) / L, x = w.x1 + ux * o.t, y = w.y1 + uy * o.t;
+      let nx = -uy, ny = ux;
+      if (f.loops.some((lp) => inPoly(lp, x + nx * 30, y + ny * 30))) { nx = -nx; ny = -ny; }
+      return { x, y, nx, ny };
+    }
+    return null;
   }
 
   async function showModel(el, m) {
